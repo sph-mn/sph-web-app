@@ -1,0 +1,13 @@
+#!/bin/sh
+
+t=$1/usr/share/guile/site
+mkdir -p $t
+cp -rt $t sph
+
+t=$1/usr/share/sph/web/app
+mkdir -p $t
+cp -rt $t default-project minimal-project
+
+t=$1/usr/bin
+mkdir -p $t
+cp -t $t exec/web-app
