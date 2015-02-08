@@ -10,17 +10,18 @@
     (sph base)
     (sph documentation)
     (sph web app)
+    (sph web http)
     (sph web html-sxml))
 
   ;various extending utility bindings that can be included on demand
 
-  (define-syntax-rule (nginx-respond-file path mime-type)
+  (define (nginx-respond-file path mime-type)
     ;the path is always relative to a configured nginx location
     (respond 200
       (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type))
       ""))
 
-  (define-syntax-rule (nginx-respond-file-download path file-name mime-type)
+  (define (nginx-respond-file-download path file-name mime-type)
     (respond 200
       (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type)
         (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
