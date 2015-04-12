@@ -24,6 +24,7 @@
     swa-project-name
     swa-request
     swa-root
+    swa-init-config
     swa-start
     swa-start-http
     swa-start-scgi
