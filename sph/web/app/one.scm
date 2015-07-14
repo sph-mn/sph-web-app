@@ -16,12 +16,14 @@
   ;various extending utility bindings that can be included on demand
 
   (define (nginx-respond-file path mime-type)
-    ;the path is always relative to a configured nginx location
+    "the path is always relative to a configured nginx location"
     (respond 200
       (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type))
       ""))
 
   (define (nginx-respond-file-download path file-name mime-type)
+    "like nginx-respond-file but adds a content-disposition header to suggest to the client
+    that it should be treated as a download even if the client can display it"
     (respond 200
       (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type)
         (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
