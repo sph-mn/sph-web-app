@@ -2,7 +2,6 @@
   (export
     call-hook
     html-sxml-includes-proc
-    library-documentation-html-sxml
     nginx-respond-file
     nginx-respond-file-download)
   (import

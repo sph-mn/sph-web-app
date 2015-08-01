@@ -174,6 +174,7 @@
         "\n")))
 
   (define-syntax-rule (swa-init-library-prefix swa-root)
+    ;todo: check for malfunction because of different path prefixes in swa-paths to same destination directories because of symlink resolution
     (let*
       ( (library-prefix (path->module-name swa-root))
         (library-prefix
