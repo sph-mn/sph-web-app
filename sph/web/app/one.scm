@@ -6,11 +6,12 @@
     nginx-respond-file-download)
   (import
     (rnrs base)
-    (sph base)
+    (sph)
     (sph documentation)
+    (sph hashtable)
     (sph web app)
-    (sph web http)
-    (sph web html-sxml))
+    (sph web html-sxml)
+    (sph web http))
 
   ;various extending utility bindings that can be included on demand
 

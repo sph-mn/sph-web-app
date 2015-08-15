@@ -15,7 +15,7 @@
     swa-http-response-body-set!
     swa-http-response-content-type-set
     swa-http-response-header
-    swa-http-response-header-add
+    swa-http-response-header-add!
     swa-http-response-header-set!
     swa-http-response-status
     swa-http-response-status-set!
@@ -42,7 +42,7 @@
 
   (define-syntax-rule (swa-http-create-response status headers body) (vector status headers body))
 
-  (define-syntax-rules swa-http-response ((arg) (swa-http-response* arg))
+  (define-syntax-rules swa-http-response ((a) (swa-http-response* a))
     ((status body) (swa-http-create-response status (list) body))
     ((status header body) (swa-http-create-response status header body)))
 
@@ -63,13 +63,13 @@
     depends on the scgi header variable \"https\", which should have the value \"on\" when the request is an https request"
     (string-equal? "on" (alist-ref h "https")))
 
-  (define (swa-http-response-content-type-add arg key)
+  (define (swa-http-response-content-type-add a key)
     "vector:swa-http-response content-type-identifier -> vector:swa-http-response
     adds a header-line for setting the content-type to the response and results in the extended response.
     key has to exist in swa-http-key->mime-type. by default json, html, text, style and script are available."
-    (swa-http-response-header-add arg (swa-http-header-content-type key)))
+    (swa-http-response-header-add! a (swa-http-header-content-type key)))
 
-  (define (swa-http-response* arg)
+  (define (swa-http-response* a)
     "integer/vector/procedure:{port ->}/string/any -> vector:swa-http-response
     integer: http status code only, empty response-body
     vector: as is. likely a swa-http-response-record
@@ -77,10 +77,10 @@
     string: http 200, string as response-body
     boolean-false: 404
     else: http 200, empty response-body"
-    (if arg
-      (if (procedure? arg) (swa-http-create-response 200 (list) arg)
-        (if (integer? arg) (swa-http-create-response arg (list) "")
-          (if (vector? arg) arg (swa-http-create-response 200 (list) (if (string? arg) arg "")))))
+    (if a
+      (if (procedure? a) (swa-http-create-response 200 (list) a)
+        (if (integer? a) (swa-http-create-response a (list) "")
+          (if (vector? a) a (swa-http-create-response 200 (list) (if (string? a) a "")))))
       (swa-http-create-response 404 (list) "")))
 
   (define (swa-http-request-cookie headers) "alist -> alist:parsed-cookie"
@@ -99,10 +99,10 @@
     example http method names are get/post/put"
     (false-if-exception (string->symbol (string-downcase (alist-ref headers "request_method")))))
 
-  (define (swa-http-response-header-add arg . header)
+  (define (swa-http-response-header-add! a . header-lines)
     "vector:swa-http-response string:header-line ... -> vector:swa-http-response
     add header-lines to the response and result in the extended response"
-    (swa-http-response-header-set! arg (append header (swa-http-response-header arg))) arg)
+    (swa-http-response-header-set! a (append header-lines (swa-http-response-header a))) a)
 
   (define (swa-http-respond-parse-query-string headers client app-respond)
     "list:response-header:(string:header-line ...) port procedure:{string:path list:parsed-url-query-string list:headers port:client} ->
@@ -110,14 +110,17 @@
     key/value pairs in the query string should be separated by ; (as recommended in favor of & by the w3c).
     note that this procedure is not required for using query-strings and that it is possible to manually parse the query string from the request-url when needed
     (for example with swa-http-split-query-string)"
-    (apply (l (path . args) (swa-http-send-response (app-respond path args headers client) client))
+    (apply
+      (l (path . arguments)
+        (swa-http-send-response (app-respond path arguments headers client) client))
       (swa-http-split-query-string (alist-ref headers "request_uri"))))
 
   (define (swa-http-split-query-string url-path)
     "list:headers string -> (string . alist:((string . string) ...))"
     (apply
-      (l (path . args)
-        (pair path (if (null? args) args (http-uri-query-string->alist (first args) #\;))))
+      (l (path . arguments)
+        (pair path
+          (if (null? arguments) arguments (http-uri-query-string->alist (first arguments) #\;))))
       (string-split url-path #\?)))
 
   (define (swa-http-respond headers client app-respond)
