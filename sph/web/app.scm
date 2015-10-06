@@ -19,12 +19,12 @@
     respond-type
     swa-http-response
     swa-http-response*
+    swa-init-config
     swa-library-prefix
     swa-paths
     swa-project-name
     swa-request
     swa-root
-    swa-init-config
     swa-start
     swa-start-http
     swa-start-scgi
@@ -62,21 +62,21 @@
     (only (sph string) string-longest-prefix)
     (only (srfi srfi-1) last))
 
-  (define-syntax-rule (swa-search-load-paths arg)
-    (any (l (ele) (let (path (string-append ele arg)) (if (file-exists? path) path #f))) swa-paths))
+  (define-syntax-rule (swa-search-load-paths a)
+    (any (l (ele) (let (path (string-append ele a)) (if (file-exists? path) path #f))) swa-paths))
 
-  (define-syntax-rule (swa-path->module-name arg)
-    (let (path (swa-search-load-paths arg))
+  (define-syntax-rule (swa-path->module-name a)
+    (let (path (swa-search-load-paths a))
       (if path
         (path->symbol-list
           (string-drop path (string-length (string-longest-prefix path %load-path))))
         path)))
 
-  (define-syntax-rule (swa-module-name->path arg)
-    (%search-load-path (string-append (string-join (map symbol->string arg) "/") ".scm")))
+  (define-syntax-rule (swa-module-name->path a)
+    (%search-load-path (string-append (string-join (map symbol->string a) "/") ".scm")))
 
-  (define-syntax-rule (swa-module-name->root-path arg)
-    (string-longest-prefix (swa-module-name->path arg) swa-paths))
+  (define-syntax-rule (swa-module-name->root-path a)
+    (string-longest-prefix (swa-module-name->path a) swa-paths))
 
   (define primitive-branch-ref
     (procedure->cached-procedure
@@ -134,10 +134,10 @@
     (primitive-branch-ref (q unquoted-branch-name) (q unquoted-binding-name)
       (q unquoted-project-name) ...))
 
-  (define (import-path->swa-path arg)
+  (define (import-path->swa-path a)
     (any
       (l (ele)
-        (let (full-path (string-append ele "/" arg "/")) (if (file-exists? full-path) full-path #f)))
+        (let (full-path (string-append ele "/" a "/")) (if (file-exists? full-path) full-path #f)))
       %load-path))
 
   (define (swa-sync-import-root-files swa-root . paths)
