@@ -63,7 +63,7 @@
     (only (srfi srfi-1) last))
 
   (define-syntax-rule (swa-search-load-paths a)
-    (any (l (ele) (let (path (string-append ele a)) (if (file-exists? path) path #f))) swa-paths))
+    (any (l (e) (let (path (string-append e a)) (if (file-exists? path) path #f))) swa-paths))
 
   (define-syntax-rule (swa-path->module-name a)
     (let (path (swa-search-load-paths a))
@@ -136,18 +136,18 @@
 
   (define (import-path->swa-path a)
     (any
-      (l (ele)
-        (let (full-path (string-append ele "/" a "/")) (if (file-exists? full-path) full-path #f)))
+      (l (e)
+        (let (full-path (string-append e "/" a "/")) (if (file-exists? full-path) full-path #f)))
       %load-path))
 
   (define (swa-sync-import-root-files swa-root . paths)
-    "copy non-generated files from the imports root-directories into the current root.
-    currently requires that the filesystem supports symlinks"
+    "symlink non-generated files from the imports root-directories into the current root.
+    currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
     (each
-      (l (ele)
+      (l (e)
         (system
           (string-join
-            (list "cp" "-Lrsut" (string-append swa-root "root") (string-append ele "root/*")) " ")))
+            (list "cp" "-Lrsut" (string-append swa-root "root") (string-append e "root/*")) " ")))
       paths))
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
