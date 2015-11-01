@@ -44,4 +44,4 @@
         #:options
         (ql ((target)) (minimal #\m #f #f #f #f "creates only a minimal project structure"))))
     (options (cli)))
-  (if (null? options) (cli "--help") (web-app options)))
+  (if (null? options) (cli (list "--help")) (web-app options)))
