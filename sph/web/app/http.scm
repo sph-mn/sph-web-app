@@ -20,6 +20,7 @@
     swa-http-response-status
     swa-http-response-status-set!
     swa-http-send-response
+    swa-http-send-response-body
     swa-http-split-query-string)
   (import
     (guile)
@@ -128,6 +129,12 @@
     receives a request and applies app-respond with request data to create a response"
     (swa-http-send-response (app-respond (alist-ref headers "request_uri") headers client) client))
 
+  (define (swa-http-send-response-body a client)
+    (if (procedure? a) (begin (display "\n" client) (a client))
+      (if (string? a)
+        (begin (display (http-header-line "content-length" (string-octet-length a)) client)
+          (display "\n" client) (display a client)))))
+
   (define (swa-http-send-response response client)
     "vector:swa-http-response port ->
     sends a response with http syntax.
@@ -135,8 +142,4 @@
     this enables stream-like response-body sending"
     (http-write-status-line (swa-http-response-status response) client)
     (each (l (line) (display line client)) (swa-http-response-header response))
-    (let (body (swa-http-response-body response))
-      (if (procedure? body) (begin (display "\n" client) (body client))
-        (if (string? body)
-          (begin (display (http-header-line "content-length" (string-octet-length body)) client)
-            (display "\n" client) (display body client)))))))
+    (swa-http-send-response-body (swa-http-response-body response) client)))
