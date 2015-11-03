@@ -1,7 +1,7 @@
 (library (sph web app one)
   (export
     call-hook
-    html-sxml-includes-proc
+    sxml-html-includes-proc
     nginx-respond-file
     nginx-respond-file-download)
   (import
@@ -10,7 +10,7 @@
     (sph documentation)
     (sph hashtable)
     (sph web app)
-    (sph web html-sxml)
+    (sph web sxml-html)
     (sph web http))
 
   ;various extending utility bindings that can be included on demand
@@ -29,13 +29,13 @@
         (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
       ""))
 
-  (define (html-sxml-includes-proc static-style dynamic-style static-script dynamic-script)
+  (define (sxml-html-includes-proc static-style dynamic-style static-script dynamic-script)
     "creates a procedure that serves or processes given assets by default, and additional ones if given as arguments. dynamic means templates that are compiled, static are just path references
-    initialisation: (define html-sxml-include (html-sxml-includes-proc (list) (list \"lib/client/one\") (list) (list)))
-    usage: (html-sxml-include (q style) ref)"
+    initialisation: (define sxml-html-include (sxml-html-includes-proc (list) (list \"lib/client/one\") (list) (list)))
+    usage: (sxml-html-include (q style) ref)"
     (let
-      ( (static-style (map html-sxml-include-style static-style))
-        (static-script (map html-sxml-include-script static-script)))
+      ( (static-style (map sxml-html-include-style static-style))
+        (static-script (map sxml-html-include-script static-script)))
       (let-syntax
         ( (get-sxml
             (syntax-rule (type ref static dynamic prepare-dynamic create-include-sxml)
@@ -44,8 +44,8 @@
                   (append (apply prepare-dynamic #f dynamic) (ref type (list))))))))
         (l (type ref)
           (if (eqv? (q style) type)
-            (get-sxml type ref static-style dynamic-style client-style html-sxml-include-style)
-            (get-sxml type ref static-script dynamic-script client-script html-sxml-include-script))))))
+            (get-sxml type ref static-style dynamic-style client-style sxml-html-include-style)
+            (get-sxml type ref static-script dynamic-script client-script sxml-html-include-script))))))
 
   (define (call-hook hook-procedures hook-name . a)
     "rnrs-hashtable symbol procedure-arguments ... -> any
