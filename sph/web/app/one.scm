@@ -1,19 +1,17 @@
 (library (sph web app one)
   (export
     call-hook
-    sxml-html-includes-proc
     nginx-respond-file
-    nginx-respond-file-download)
+    nginx-respond-file-download
+    sxml-html-includes-proc)
   (import
     (rnrs base)
     (sph)
     (sph documentation)
     (sph hashtable)
     (sph web app)
-    (sph web sxml-html)
-    (sph web http))
-
-  ;various extending utility bindings that can be included on demand
+    (sph web http)
+    (sph web sxml-html))
 
   (define (nginx-respond-file path mime-type)
     "the path is always relative to a configured nginx location"

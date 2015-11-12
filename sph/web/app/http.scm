@@ -47,7 +47,7 @@
     ((status body) (swa-http-create-response status (list) body))
     ((status header body) (swa-http-create-response status header body)))
 
-  (define-as swa-http-key->mime-type hashtable-quoted
+  (define-as swa-http-key->mime-type symbol-hashtable
     json "application/json"
     html "text/html" text "text/plain" style "test/css" script "text/javascript")
 

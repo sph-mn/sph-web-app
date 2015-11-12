@@ -37,15 +37,15 @@
 
   (define default-env (apply environment (ql (rnrs base) (sph))))
 
-  (define-as lang->source-suffix hashtable-quoted
+  (define-as lang->source-suffix symbol-hashtable
     ;the file-name suffixes to look for when requesting template files in a specific language
     sescript ".sjs" plcss ".plcss" sxml ".sxml" html ".html")
 
-  (define-as lang->target-name hashtable-quoted
+  (define-as lang->target-name symbol-hashtable
     ;the root/-relative target directories to put compiled templates into
     sxml "html" sescript "script" plcss "style")
 
-  (define-as client-lang->env hashtable-quoted
+  (define-as client-lang->env symbol-hashtable
     ;templates are evaluated with their own environments for inline-code/unquote evaluation
     sescript default-env plcss default-env sxml default-env)
 
@@ -64,12 +64,12 @@
                   " ")))
             (delete-file temp-path))))))
 
-  (define-as lang->translate hashtable-quoted
+  (define-as lang->translate symbol-hashtable
     ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
     sescript (l (a port) (sescript-use-strict port) (sescript->ecmascript a port))
     plcss plcss->css sxml sxml->xml)
 
-  (define-as lang->post-process hashtable-quoted
+  (define-as lang->post-process symbol-hashtable
     ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
     sescript client-script-post-process)
 

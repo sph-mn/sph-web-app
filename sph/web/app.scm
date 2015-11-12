@@ -9,6 +9,7 @@
     client-templates
     config-ref
     config-set!
+    symbol-hashtable
     headers-content-length
     import-all-branches
     log-message
@@ -27,8 +28,7 @@
     swa-root
     swa-start
     swa-start-http
-    swa-start-scgi
-    hashtable-quoted)
+    swa-start-scgi)
   (import
     (guile)
     (ice-9 match)
@@ -48,6 +48,7 @@
     (web http)
     (web request)
     (web server)
+    (only (sph process) shell-eval)
     (web uri)
     (only (sph alist) alist-ref)
     (only (sph filesystem) path->list path->full-path)
@@ -101,7 +102,7 @@
     ;binding-name-parts are joined with \"-\"
     ;example
     ;\"content/view\" maps to the binding content-view in the module (project-name branch content).
-    ;the project-name argument limits the imported/extended projects to search in which might decrease execution time."
+    ;the project-name argument limits the imported/extended projects to search in, which might decrease execution time."
     (apply
       (l (branch . variable)
         (if (null? variable) (respond 404)
@@ -129,7 +130,7 @@
 
   (define-syntax-rule
     (branch-ref unquoted-branch-name unquoted-binding-name unquoted-project-name ...)
-    ;get a binding from a branch at run-time. with this branch modules do not need to depend on each other
+    ;get a binding from a branch at run-time. with this, branch modules do not need to depend on each other
     ;to make internal redirects
     (primitive-branch-ref (q unquoted-branch-name) (q unquoted-binding-name)
       (q unquoted-project-name) ...))
@@ -145,9 +146,10 @@
     currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
     (each
       (l (e)
-        (system
-          (string-join
-            (list "cp" "-Lrsut" (string-append swa-root "root") (string-append e "root/*")) " ")))
+        (shell-eval
+          (string-append
+            "cp --recursive --no-clobber --dereference --symbolic-link --target-directory="
+            (string-append swa-root "root") " " (string-append e "root/*"))))
       paths))
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
