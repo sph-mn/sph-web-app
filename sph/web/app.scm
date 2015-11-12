@@ -28,7 +28,7 @@
     swa-start
     swa-start-http
     swa-start-scgi
-    symbol-hashtable)
+    hashtable-quoted)
   (import
     (guile)
     (ice-9 match)

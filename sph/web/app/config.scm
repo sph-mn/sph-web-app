@@ -9,7 +9,7 @@
     (rnrs base)
     (sph hashtable))
 
-  (define swa-default-config (symbol-hashtable config-name "default"))
+  (define swa-default-config (hashtable-quoted config-name "default"))
   (define swa-paths #f)
   (define swa-root #f)
   (define swa-library-prefix)

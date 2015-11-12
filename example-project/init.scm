@@ -14,6 +14,6 @@
   (define (app-respond path h client)
     (match-path path
       ( ()
-        (respond-html (symbol-hashtable title "testtitle")
+        (respond-html (hashtable-quoted title "testtitle")
           (list (list "lib/client/default-wrap" (q (div "root path response"))))))
       (_ (respond "default route")))))
