@@ -226,7 +226,7 @@
             (l (socket) (start-message listen-address listen-port)
               (if (config-ref development)
                 ;single-threaded without exception handler
-                (scgi-handle-requests
+ (scgi-handle-requests
                   (l (headers client) (http-respond headers client app-respond)) socket 1)
                 ;possibly multi-threaded and all exceptions catched for continuous processing
                 (scgi-handle-requests
