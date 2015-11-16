@@ -118,7 +118,9 @@
 
   (define (client-template-source source suffix)
     "template-source string -> template-source
-    convert relative paths in template-source to full-paths"
+    convert relative paths in template-source to full-paths.
+    source can be a pair of the form (path-prefix . path-suffix),
+    called a context, which is used to create a path with an automatically determined infix"
     (every-map
       (l (merged)
         (if (string? merged) (if (string-prefix? "/" merged) merged (source->path merged suffix))
@@ -138,7 +140,8 @@
 
   (define (client-templates target lang bindings . source)
     "boolean/port:target symbol alist list ... -> datum/list:paths/unspecified
-    the template-handler used by client-html/script/style"
+    the template-handler used by client-html/script/style.
+    uses the (sph lang template) source format and extends it with"
     (let
       ( (env (hashtable-ref client-lang->env lang))
         (target-name (hashtable-ref lang->target-name lang))
