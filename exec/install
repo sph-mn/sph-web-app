@@ -1,20 +1,8 @@
-#!/bin/sh
+#!/usr/bin/guile
+!#
 
-t=$1/usr/share/guile/site
-mkdir -p $t
-cp -rt $t sph
-find $t/sph -type f -exec chmod 644 {} \; &&
-find $t/sph -type d -exec chmod 755 {} \;
+(import (sph install))
 
-t=$1/usr/share/sph/web/app
-mkdir -p $t
-cp -rt $t example-project minimal-project
-t=$1/usr/share/sph
-find $t -type f -exec chmod 644 {} \; &&
-find $t -type d -exec chmod 755 {} \;
-chmod 755 -R $t/web/app/*/exec/*
-
-t=$1/usr/bin
-mkdir -p $t
-cp -t $t exec/web-app
-chmod 755 $t/web-app
+(install-cli-guile (path-lib-scheme "sph")
+  ("/usr/share/sph/web/app" "other/project-example" "other/project-minimal")
+  ("/usr/bin" "exec/web-app"))

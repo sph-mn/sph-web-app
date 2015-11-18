@@ -2,28 +2,27 @@
 !#
 
 ;depends on "cp" and "sed"
-
 (import (sph) (sph alist) (only (sph one) program-path) (sph filesystem) (sph cli))
-(define example-project-path "/usr/share/sph/web/app/example-project")
-(define minimal-project-path "/usr/share/sph/web/app/minimal-project")
+(define path-project-example "/usr/share/sph/web/app/project-example")
+(define path-project-minimal "/usr/share/sph/web/app/project-minimal")
 
 (define (create-new-project path options)
   (let*
-    ( (minimal (alist-ref options (q minimal)))
-      (source-path (if minimal minimal-project-path example-project-path)))
+    ( (example? (alist-quoted-ref options example))
+      (source-path (if example? path-project-example path-project-minimal)))
     (if (file-exists? source-path)
       (begin (ensure-directory-structure path)
         (let
           (sed-file-paths
-            (if minimal
+            (if example?
               (begin
                 (system* "cp" "--dereference"
-                  "--recursive" "--no-target-directory" source-path path)
-                (list))
+                  "--recursive" "--preserve=mode" "--no-target-directory" source-path path)
+                (list (string-append path "branch/main.scm")))
               (begin
                 (system* "cp" "--dereference"
-                  "--recursive" "--no-target-directory" source-path path)
-                (list (string-append path "branch/main.scm")))))
+                  "--preserve=mode" "--recursive" "--no-target-directory" source-path path)
+                (list))))
           (apply system* "sed"
             "-i" (string-append "s/project-name/" (basename path) "/g")
             (string-append path "init.scm") sed-file-paths)))
@@ -38,10 +37,9 @@
             (simple-format #t "created ~A\n" target-path))))
       (begin (simple-format #t "please specify a target path or name\n") (exit)))))
 
-(let*
-  ( (cli
-      (cli-create #:about "creates new (web app) projects"
-        #:options
-        (ql ((target)) (minimal #\m #f #f #f #f "creates only a minimal project structure"))))
-    (options (cli)))
-  (if (null? options) (cli (list "--help")) (web-app options)))
+(define command-line-interface
+  (cli-create #:description "creates new (web app) projects"
+    #:options (ql ((target)) (example #f #f #f #f #f "creates an example project structure"))))
+
+(let (arguments (command-line-interface))
+  (if (null? arguments) (command-line-interface (list "--help")) (web-app arguments)))
