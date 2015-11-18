@@ -32,7 +32,7 @@
   (let (target-path (alist-ref options (q target)))
     (if target-path
       (let (target-path (path->full-path target-path))
-        (if (file-exists? target-path) (simple-format #t "failed: \"~A\" exists\n" target-path)
+        (if (file-exists? target-path) (simple-format #t "failed: \"~A\" already exists\n" target-path)
           (begin (create-new-project (ensure-trailing-slash target-path) options)
             (simple-format #t "created ~A\n" target-path))))
       (begin (simple-format #t "please specify a target path or name\n") (exit)))))

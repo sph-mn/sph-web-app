@@ -9,7 +9,6 @@
     client-templates
     config-ref
     config-set!
-    symbol-hashtable
     headers-content-length
     import-all-branches
     log-message
