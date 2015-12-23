@@ -47,7 +47,6 @@
     (web http)
     (web request)
     (web server)
-    (only (sph process) shell-eval)
     (web uri)
     (only (sph alist) alist-ref)
     (only (sph filesystem) path->list path->full-path)
@@ -56,8 +55,9 @@
       call-if-defined
       path->module-name
       path->symbol-list
-      directory-tree-module-names)
+      path->module-names)
     (only (sph one) procedure->cached-procedure program-path)
+    (only (sph process) shell-eval)
     (only (sph server) server-create-bound-socket)
     (only (sph string) string-longest-prefix)
     (only (srfi srfi-1) last))
@@ -160,8 +160,8 @@
     (if swa-paths
       (let (m (current-module))
         (map (compose (l (e) (module-use! m e)) resolve-interface)
-          (directory-tree-module-names
-            (string-append (swa-module-name->root-path (module-name m)) "branch/") 1)))))
+          (path->module-names
+            (string-append (swa-module-name->root-path (module-name m)) "branch/") #:max-depth 1)))))
 
   (define-syntax-rule (import-init library-prefix)
     ;import the init.scm module
@@ -177,7 +177,7 @@
   (define-syntax-rule (swa-init-library-prefix swa-root)
     ;todo: check for malfunction because of different path prefixes in swa-paths to same destination directories because of symlink resolution
     (let*
-      ( (library-prefix (path->module-name swa-root))
+      ( (library-prefix (path->module-name swa-root #t))
         (library-prefix
           (if library-prefix library-prefix
             (begin (add-to-load-path (dirname swa-root)) (path->module-name swa-root)))))
@@ -225,7 +225,7 @@
             (l (socket) (start-message listen-address listen-port)
               (if (config-ref development)
                 ;single-threaded without exception handler
- (scgi-handle-requests
+                (scgi-handle-requests
                   (l (headers client) (http-respond headers client app-respond)) socket 1)
                 ;possibly multi-threaded and all exceptions catched for continuous processing
                 (scgi-handle-requests
