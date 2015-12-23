@@ -148,7 +148,7 @@
         (shell-eval
           (string-append
             "cp --recursive --no-clobber --dereference --symbolic-link --target-directory="
-            (string-append swa-root "root") " " (string-append e "root/*"))))
+            (string-append swa-root "root") " " (string-append e "root/*") " 2> /dev/null")))
       paths))
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
