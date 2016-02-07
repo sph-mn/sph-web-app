@@ -181,7 +181,7 @@
         (library-prefix
           (if library-prefix library-prefix
             (begin (add-to-load-path (dirname swa-root)) (path->module-name swa-root)))))
-      (if library-prefix
+      (if (and (list? library-prefix) (not (null? library-prefix)))
         (begin (set! swa-library-prefix library-prefix)
           (set! swa-project-name (symbol->string (last library-prefix))) (import-init library-prefix))
         (throw (q project-not-in-load-path) "this is required for loading application parts"
@@ -276,7 +276,8 @@
     applies app-init without arguments if it is defined in the current-module"
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
-    (apply swa-sync-import-root-files swa-paths) (swa-init-library-prefix swa-root)
+    (apply swa-sync-import-root-files swa-paths)
+    (swa-init-library-prefix swa-root)
     (swa-init-config config) (client-init)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
       (call-if-defined m (q app-init)) (proc app-respond)
