@@ -3,6 +3,6 @@
 
 (import (sph install))
 
-(install-cli-guile (path-lib-scheme "sph")
+(install-cli-guile (path-lib-scheme "modules/sph")
   ("/usr/share/sph/web/app" "other/project-example" "other/project-minimal")
-  ("/usr/bin" "exec/web-app"))
+  ("/usr/bin" "exe/web-app"))
