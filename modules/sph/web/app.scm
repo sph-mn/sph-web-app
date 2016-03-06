@@ -281,4 +281,4 @@
     (swa-init-config config) (client-init)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
       (call-if-defined m (q app-init)) (proc app-respond)
-      (call-if-defined m (q app-exit)) (display "exit.\n"))))
+      (call-if-defined m (q app-exit)))))
