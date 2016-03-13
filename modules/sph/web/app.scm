@@ -153,15 +153,10 @@
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
 
-  (define-syntax-rule (import-all-branches)
-    ;this is syntax to make (current-module) return the local module where
-    ;import-all-branches is applied instead of the toplevel module.
-    ;swa-start sets "swa-paths", if a file containing it is evaluated directly wihout a swa-start call compilation would fail
-    (if swa-paths
-      (let (m (current-module))
-        (map (compose (l (e) (module-use! m e)) resolve-interface)
-          (path->module-names
-            (string-append (swa-module-name->root-path (module-name m)) "branch/") #:max-depth 1)))))
+  (define-syntax-case (import-all-branches) s
+    ;"imports all modules in the branch/ directory. not recursively, only the modules on the first level"
+    (let (library-names (path->module-names (string-append swa-root "branch/") #:max-depth 1))
+      (datum->syntax s (pair (q import) library-names))))
 
   (define-syntax-rule (import-init library-prefix)
     ;import the init.scm module
@@ -276,9 +271,7 @@
     applies app-init without arguments if it is defined in the current-module"
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
-    (apply swa-sync-import-root-files swa-paths)
-    (swa-init-library-prefix swa-root)
+    (apply swa-sync-import-root-files swa-paths) (swa-init-library-prefix swa-root)
     (swa-init-config config) (client-init)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
-      (call-if-defined m (q app-init)) (proc app-respond)
-      (call-if-defined m (q app-exit)))))
+      (call-if-defined m (q app-init)) (proc app-respond) (call-if-defined m (q app-exit)))))
