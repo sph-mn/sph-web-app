@@ -55,7 +55,7 @@
       call-if-defined
       path->module-name
       path->symbol-list
-      path->module-names)
+      find-modules)
     (only (sph one) procedure->cached-procedure program-path)
     (only (sph process) shell-eval)
     (only (sph server) server-create-bound-socket)
@@ -155,7 +155,7 @@
 
   (define-syntax-case (import-all-branches) s
     ;"imports all modules in the branch/ directory. not recursively, only the modules on the first level"
-    (let (library-names (path->module-names (string-append swa-root "branch/") #:max-depth 1))
+    (let (library-names (find-modules (string-append swa-root "branch/") #:max-depth 1))
       (datum->syntax s (pair (q import) library-names))))
 
   (define-syntax-rule (import-init library-prefix)
