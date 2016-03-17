@@ -78,6 +78,8 @@
   (define-syntax-rule (swa-module-name->root-path a)
     (string-longest-prefix (swa-module-name->path a) swa-paths))
 
+  (define (swa-path->root-path a) "string -> string/boolean" (string-longest-prefix a swa-paths))
+
   (define primitive-branch-ref
     (procedure->cached-procedure
       (l* (branch-name binding-name #:optional project-name)
@@ -154,8 +156,12 @@
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
 
   (define-syntax-case (import-all-branches) s
-    ;"imports all modules in the branch/ directory. not recursively, only the modules on the first level"
-    (let (library-names (find-modules (string-append swa-root "branch/") #:max-depth 1))
+    ;"imports all modules in the branch/ directory. not recursively, only the modules on the first level.
+    ;a catch here is to load the branch module files relative to the currently evaluated file.
+    ;(current-filename) gave #f"
+    (let*
+      ( (swa-root (swa-module-name->root-path (module-name (current-module))))
+        (library-names (find-modules (string-append swa-root "branch/") #:max-depth 1)))
       (datum->syntax s (pair (q import) library-names))))
 
   (define-syntax-rule (import-init library-prefix)
