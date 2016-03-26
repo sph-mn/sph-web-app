@@ -5,4 +5,4 @@
 
 (install-cli-guile (path-lib-scheme "modules/sph")
   ("/usr/share/sph/web/app" "other/project-example" "other/project-minimal")
-  ("/usr/bin" "exe/web-app"))
+  ("/usr/bin" #o755 "exe/web-app"))
