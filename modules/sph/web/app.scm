@@ -1,7 +1,7 @@
 (library (sph web app)
   (export
     branch-ref
-    branch-route
+    branch-route-path
     client-html
     client-lang->env
     client-script
@@ -97,13 +97,13 @@
               (variable (module-variable module (symbol-append branch-name (q -) binding-name))))
             (variable-ref variable))))))
 
-  (define-syntax-rule (branch-route project-name path args ...)
-    ;"select the branch-procedure to apply from the path of the url.
-    ;branch-name[/binding-name-part ...]
-    ;binding-name-parts are joined with \"-\"
-    ;example
-    ;\"content/view\" maps to the binding content-view in the module (project-name branch content).
-    ;the project-name argument limits the imported/extended projects to search in, which might decrease execution time."
+  (define (branch-route-path project-name path . arguments)
+    "select the branch-procedure to apply from the path of the url.
+    branch-name[/binding-name-part ...]
+    binding-name-parts are joined with \"-\"
+    example
+    \"content/view\" maps to the binding content-view in the module (project-name branch content).
+    the project-name argument limits the imported/extended projects to search in, which might decrease execution time"
     (apply
       (l (branch . variable)
         (if (null? variable) (respond 404)
@@ -111,7 +111,7 @@
             (proc
               (primitive-branch-ref (string->symbol branch)
                 (string->symbol (string-join variable "-")) project-name))
-            (if proc (proc args ...) (respond 404)))))
+            (if proc (apply proc arguments) (respond 404)))))
       (tail (string-split path #\/))))
 
   (define-syntax-rules respond-type
