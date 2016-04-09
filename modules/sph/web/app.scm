@@ -19,7 +19,7 @@
     respond-type
     swa-http-response
     swa-http-response*
-    swa-init-config
+    swa-initialise-config
     swa-library-prefix
     swa-paths
     swa-project-name
@@ -164,9 +164,9 @@
         (library-names (find-modules (string-append swa-root "branch/") #:max-depth 1)))
       (datum->syntax s (pair (q import) library-names))))
 
-  (define-syntax-rule (import-init library-prefix)
-    ;import the init.scm module
-    (module-use! (current-module) (resolve-interface (append library-prefix (q (init))))))
+  (define-syntax-rule (import-main library-prefix)
+    ;import the main.scm module
+    (module-use! (current-module) (resolve-interface (append library-prefix (q (main))))))
 
   (define-syntax-rule (start-message address port)
     (display
@@ -175,7 +175,7 @@
           "")
         "\n")))
 
-  (define-syntax-rule (swa-init-library-prefix swa-root)
+  (define-syntax-rule (swa-initialise-library-prefix swa-root)
     ;todo: check for malfunction because of different path prefixes in swa-paths to same destination directories because of symlink resolution
     (let*
       ( (library-prefix (path->module-name swa-root #t))
@@ -184,11 +184,11 @@
             (begin (add-to-load-path (dirname swa-root)) (path->module-name swa-root)))))
       (if (and (list? library-prefix) (not (null? library-prefix)))
         (begin (set! swa-library-prefix library-prefix)
-          (set! swa-project-name (symbol->string (last library-prefix))) (import-init library-prefix))
+          (set! swa-project-name (symbol->string (last library-prefix))) (import-main library-prefix))
         (throw (q project-not-in-load-path) "this is required for loading application parts"
           (q search-paths) %load-path (q guessed-root-directory) swa-root))))
 
-  (define (swa-init-config config) (config-load swa-default-config)
+  (define (swa-initialise-config config) (config-load swa-default-config)
     (catch (if config (q none) (q configuration-file-does-not-exist)) (l () (config-load config))
       (l args #f)))
 
@@ -274,10 +274,11 @@
     it is no problem to use (sph lang template) source-files in the parent project, the compilation
     results are always stored in the parents \"root/\" directory.
     all other files from the \"root/\" of imported-projects will be symlinked into the parent \"root/\".
-    applies app-init without arguments if it is defined in the current-module"
+    applies app-initialise without arguments if it is defined in the current-module"
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
-    (apply swa-sync-import-root-files swa-paths) (swa-init-library-prefix swa-root)
-    (swa-init-config config) (client-init)
+    (apply swa-sync-import-root-files swa-paths) (swa-initialise-library-prefix swa-root)
+    (swa-initialise-config config) (client-initialise)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
-      (call-if-defined m (q app-init)) (proc app-respond) (call-if-defined m (q app-exit)))))
+      (call-if-defined m (q app-initialise)) (proc app-respond)
+      (call-if-defined m (q app-deinitialise)))))

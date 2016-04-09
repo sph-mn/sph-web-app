@@ -1,9 +1,7 @@
-;client-code processing
-
 (library (sph web app client)
   (export
     client-html
-    client-init
+    client-initialise
     client-lang->env
     client-script
     client-style
@@ -35,6 +33,7 @@
     (only (sph two) search-env-path-variable)
     (only (srfi srfi-1) filter-map))
 
+  ;client-code processing
   (define default-env (apply environment (ql (rnrs base) (sph))))
 
   (define-as lang->source-suffix symbol-hashtable
@@ -101,7 +100,7 @@
       (let loop ((e (readdir d)) (result init))
         (if (eof-object? e) result (loop (readdir d) (proc e result))))))
 
-  (define (client-init)
+  (define (client-initialise)
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
       (l (e)
