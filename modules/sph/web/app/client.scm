@@ -157,7 +157,7 @@
                     ( (translate (hashtable-ref lang->translate lang))
                       (post-process (hashtable-ref lang->post-process lang)))
                     (ensure-directory-structure (dirname target))
-                    (pass-if (client-template-source e source-suffix)
+                    (if-pass (client-template-source e source-suffix)
                       (l (source)
                         (call-with-output-file target
                           (l (port)
@@ -168,14 +168,14 @@
           (each
             (let (translate (hashtable-ref lang->translate lang))
               (l (e)
-                (pass-if (client-template-source e source-suffix)
+                (if-pass (client-template-source e source-suffix)
                   (l (source)
                     (template-fold (l (e result) (translate e target)) source bindings env #f)))))
             source))
         (apply append
           (map
             (l (e)
-              (pass-if (client-template-source e source-suffix)
+              (if-pass (client-template-source e source-suffix)
                 (template-fold pair source bindings env (list))))
             source)))))
 

@@ -219,7 +219,7 @@
         (let
           ( (listen-address
               (or (config-ref listen-address)
-                (pass-if (config-ref socket-name)
+                (if-pass (config-ref socket-name)
                   (l (a) (string-append (dirname scgi-default-address) "/" a)) scgi-default-address)))
             (listen-port (config-ref listen-port)))
           (call-with-socket listen-address listen-port

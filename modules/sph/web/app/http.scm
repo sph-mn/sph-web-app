@@ -92,7 +92,7 @@
   (define (swa-http-if-modified-since h)
     "headers -> integer:unix-time-seconds/false
     expects the header to be called \"if_modified_since\""
-    (false-if-exception (pass-if (alist-ref h "if_modified_since") http-parse-date->seconds)))
+    (false-if-exception (if-pass (alist-ref h "if_modified_since") http-parse-date->seconds)))
 
   (define (swa-http-request-method headers)
     "alist -> symbol:http-method-name
