@@ -13,6 +13,6 @@
   (define (app-respond path h client)
     (match-path path
       ( ()
-        (respond-html (alist-quoted title "testtitle")
+        (respond-html (alist-q title "testtitle")
           (list (list "lib/client/default-wrap" (q (div "root path response"))))))
       (_ (respond "default route")))))

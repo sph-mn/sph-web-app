@@ -180,16 +180,16 @@
             source)))))
 
   (define (client-html target bindings . sources)
-    "port alist-quoted template-source ... ->
+    "port alist-q template-source ... ->
     displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
     (display "<!doctype html>" target) (apply client-templates target (q sxml) bindings sources))
 
   (define (client-script bindings . sources)
-    "alist-quoted template-source ... -> string
+    "alist-q template-source ... -> string
     evaluates sources as sescript"
     (apply client-templates #t (q sescript) bindings sources))
 
   (define (client-style bindings . sources)
-    "alist-quoted template-source ... -> string
+    "alist-q template-source ... -> string
     evaluates sources as plcss"
     (apply client-templates #t (q plcss) bindings sources)))
