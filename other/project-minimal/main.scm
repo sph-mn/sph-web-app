@@ -1,4 +1,4 @@
-(library (project-name init)
+(library (project-name main)
   (export
     app-respond)
   (import

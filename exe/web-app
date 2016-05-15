@@ -25,7 +25,7 @@
                 (list))))
           (apply system* "sed"
             "-i" (string-append "s/project-name/" (basename path) "/g")
-            (string-append path "init.scm") sed-file-paths)))
+            (string-append path "main.scm") sed-file-paths)))
       (throw (q source-path-not-found) source-path))))
 
 (define (web-app options)
@@ -39,7 +39,7 @@
 
 (define command-line-interface
   (cli-create #:description "creates new (web app) projects"
-    #:options (ql ((target)) (example #f #f #f #f #f "creates an example project structure"))))
+    #:options (ql ((target)) (example #:description "creates an example project structure"))))
 
 (let (arguments (command-line-interface))
   (if (null? arguments) (command-line-interface (list "--help")) (web-app arguments)))
