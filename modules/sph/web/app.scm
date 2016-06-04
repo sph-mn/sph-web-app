@@ -278,7 +278,7 @@
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
     (apply swa-sync-import-root-files swa-paths) (swa-initialise-library-prefix swa-root)
-    (swa-initialise-config config) (client-initialise)
+    (swa-initialise-config config)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
       (call-if-defined m (q app-initialise)) (proc app-respond)
       (call-if-defined m (q app-deinitialise)))))

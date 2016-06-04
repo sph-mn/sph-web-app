@@ -1,7 +1,7 @@
 (library (sph web app client)
   (export
+    client-delete-all-compiled-files
     client-html
-    client-initialise
     client-lang->env
     client-script
     client-style
@@ -100,7 +100,7 @@
       (let loop ((e (readdir d)) (result init))
         (if (eof-object? e) result (loop (readdir d) (proc e result))))))
 
-  (define (client-initialise)
+  (define (client-delete-all-compiled-files)
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
       (l (e)
