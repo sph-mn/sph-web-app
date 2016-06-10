@@ -53,16 +53,16 @@
         (map (l (a) (source->input-processor lang-output processor-config a)) input-spec) port-output)))
 
   (define*
-    (ac-compile->file config-lang mode output-directory output-file-name output-format
-      input-directories
-      input-spec
-      #:optional
-      processor-config)
+    (ac-compile->file config-lang mode output-directory output-format input-directories input-spec
+      #:key
+      processor-config
+      only-if-newer
+      output-file-name)
     "-> string:path-destination"
     (let
       (path-destination
         (create-output-path output-directory output-format output-file-name input-spec))
-      (if (input-files-updated? path-destination (flatten input-spec))
+      (if (or (not only-if-newer) (input-files-updated? path-destination (flatten input-spec)))
         (begin (ensure-directory-structure (dirname path-destination))
           (call-with-output-file path-destination
             (l (port)
