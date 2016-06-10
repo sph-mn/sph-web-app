@@ -1,6 +1,7 @@
 (library (sph web asset-compiler)
   (export
     ac-compile
+    ac-compile->file
     ac-input-copy
     ac-lang-input
     ac-output-copy)
@@ -9,6 +10,8 @@
     (sph record)
     (only (rnrs hashtables) equal-hash))
 
+  ;processing and merging of source files from custom load-paths to a single target file.
+  ;example use case: mix of transcompiled and non-compiled files that are merged and optimised for the web
   (define-record ac-lang-input name path? processor)
 
   (define (create-output-path path-directory format path-file input-spec)
@@ -21,7 +24,7 @@
   (define (input-files-updated? path-destination paths-input) "string (string ...) -> boolean"
     (if (file-exists? path-destination)
       (let
-        ( (paths-input-mtime (apply max (map (l (a) (stat:mtime (stat (first a)))) paths-input)))
+        ( (paths-input-mtime (apply max (map (l (a) (stat:mtime (stat a))) paths-input)))
           (path-destination-mtime (stat:mtime (stat path-destination))))
         (> paths-input-mtime path-destination-mtime))
       #t))
@@ -44,18 +47,25 @@
     config-lang: hashtable:{format-name -> (hashtable:{mode -> processor} vector:ac-lang-input ...)}
     ac-lang-input: vector:(symbol:name procedure:{string:path -> boolean} procedure:processor)
     mode: symbol/key-in-output-format-processors
-    processor: procedure:{string/list:sources port ->}
-      "
+    processor: procedure:{string/list:sources port ->}"
     (let (lang-output (hashtable-ref config-lang output-format))
       ( (lang-output->output-processor lang-output mode) processor-config
         (map (l (a) (source->input-processor lang-output processor-config a)) input-spec) port-output)))
 
-  ;todo: apply-input-processors, apply-output-processors, combine-processors, write-output-file
-
-  (define
-    (ac-compile->file config output-format output-directory output-file-name input-directories
-      input-spec)
+  (define*
+    (ac-compile->file config-lang mode output-directory output-file-name output-format
+      input-directories
+      input-spec
+      #:optional
+      processor-config)
+    "-> string:path-destination"
     (let
       (path-destination
         (create-output-path output-directory output-format output-file-name input-spec))
-      (debug-log (input-files-updated? path-destination (flatten input-spec))))))
+      (if (input-files-updated? path-destination (flatten input-spec))
+        (begin (ensure-directory-structure (dirname path-destination))
+          (call-with-output-file path-destination
+            (l (port)
+              (ac-compile config-lang mode
+                port output-format input-directories input-spec processor-config))))
+        path-destination))))
