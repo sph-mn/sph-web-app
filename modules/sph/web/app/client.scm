@@ -6,9 +6,9 @@
     client-script
     client-style
     client-templates
+    lang->pre-process-one
     lang->source-suffix
-    lang->target-name
-    lang->translate)
+    lang->target-name)
   (import
     (guile)
     (ice-9 ftw)
@@ -36,15 +36,25 @@
   ;client-code processing
   (define default-env (apply environment (ql (rnrs base) (sph))))
 
-  (define-as lang->source-suffix symbol-hashtable
-    ;the file-name suffixes to look for when requesting template files in a specific language
-    sescript ".sjs" plcss ".plcss" sxml ".sxml" html ".html")
+  (define-as type->suffixes-ht symbol-hashtable
+    script (list ".sjs" ".js") style (list ".plcss" ".css") html (list ".sxml" ".html"))
 
-  (define-as lang->target-name symbol-hashtable
-    ;the root/-relative target directories to put compiled templates into
-    sxml "html" sescript "script" plcss "style")
+  (define (type->suffixes type) (hashtable-ref type->suffixes-ht type (list "")))
 
-  (define-as client-lang->env symbol-hashtable
+  (define-as suffix->lang alist-q
+    ".css" css ".plcss" plcss ".sjs" sescript ".js" javascript ".html" html ".sxml" sxml)
+
+  (define (file-name->lang a)
+    (any
+      (l (suffix-and-lang) (and (string-suffix? (first suffix-and-lang) a) (tail suffix-and-lang)))
+      suffix->lang))
+
+  (define-as suffix->pre-process-one symbol-hashtable
+    ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
+    ".sjs" (l (a port) (sescript-use-strict port) (sescript->ecmascript a port))
+    ".plcss" plcss->css sxml sxml->xml)
+
+  (define-as lang->env symbol-hashtable
     ;templates are evaluated with their own environments for inline-code/unquote evaluation
     sescript default-env plcss default-env sxml default-env)
 
@@ -63,11 +73,6 @@
                   " ")))
             (delete-file temp-path))))))
 
-  (define-as lang->translate symbol-hashtable
-    ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
-    sescript (l (a port) (sescript-use-strict port) (sescript->ecmascript a port))
-    plcss plcss->css sxml sxml->xml)
-
   (define-as lang->post-process symbol-hashtable
     ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
     sescript client-script-post-process)
@@ -81,19 +86,19 @@
     search in swa-paths to complete a relative path"
     (any (l (e) (let (path (string-append e a)) (if (file-exists? path) path #f))) swa-paths))
 
-  (define-syntax-rule (source->path a suffix)
-    ;string:path string:suffix -> string
-    (let (path (string-append (path-add-branch-prefix a) a suffix))
-      (or (search-path path)
-        (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
-
-  (define-syntax-rule (context-source->path a suffix)
-    ;(path-prefix . path-suffix) string:suffix -> string
-    (let*
-      ( (context (first a))
-        (path (string-append (path-add-branch-prefix context) context "/client/" (tail a) suffix)))
-      (or (search-path path)
-        (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
+  (define (relative-source->path a type)
+    (let
+      (create-path
+        (pair? a
+          (l (suffix)
+            (string-append (path-add-branch-prefix (first a)) (first a) "/client/" (tail a) suffix))
+          (l (suffix) (string-append (path-add-branch-prefix a) a suffix))))
+      (any
+        (l (suffix)
+          (let* ((path (create-path suffix)) (path-found (search-path path)))
+            (identity-if path-found
+              (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
+        (type->suffixes type))))
 
   (define (directory-fold path proc init)
     (let (d (if (string? path) (opendir path) path))
@@ -108,88 +113,84 @@
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
-      (vector->list (hashtable-values lang->target-name))))
+      (vector->list (hashtable-values lang->type))))
 
-  (define (client-template-target source target-name)
+  (define (client-template-target source type)
     "any:template-source string -> string:path
     creates the full target path for one compiled template file"
-    (string-append swa-root "root/" target-name "/_" (number->string (equal-hash source) 32)))
+    (string-append swa-root "root/" type "/_" (number->string (equal-hash source) 32)))
 
-  (define (client-template-source source suffix)
+  (define (client-template-source source type)
     "template-source string -> template-source
     convert relative paths in template-source to full-paths.
     source can be a pair of the form (path-prefix . path-suffix),
-    called a context, which is used to create a path with an automatically determined infix"
+    called context, which is used to create a path with an automatically determined infix"
     (every-map
       (l (merged)
-        (if (string? merged) (if (string-prefix? "/" merged) merged (source->path merged suffix))
+        (if (string? merged)
+          (if (string-prefix? "/" merged) merged (relative-source->path merged type))
           (if (pair? merged)
             (if (list? merged)
               (map
                 (l (wrapped)
-                  (if (string? wrapped) (source->path wrapped suffix)
+                  (if (string? wrapped) (relative-source->path wrapped type)
                     (if (pair? wrapped)
-                      (if (list? wrapped) wrapped (context-source->path wrapped suffix)) wrapped)))
+                      (if (list? wrapped) wrapped (relative-source->path wrapped type)) wrapped)))
                 merged)
-              (context-source->path merged suffix))
+              (relative-source->path merged type))
             merged)))
       (any->list-s source)))
 
   (define-syntax-rule (swa-full-path->app-path a) (string-drop a (+ (string-length swa-root) 4)))
 
-  (define (client-templates target lang bindings . source)
+  (define (client-templates target type bindings . source)
     "boolean/port:target symbol alist list ... -> datum/list:paths/unspecified
     the template-handler used by client-html/script/style.
     uses the (sph lang template) source format and extends it with"
-    (let
-      ( (env (hashtable-ref client-lang->env lang))
-        (target-name (hashtable-ref lang->target-name lang))
-        (source-suffix (hashtable-ref lang->source-suffix lang))
-        (auto-target (and (boolean? target) target)))
+    (let (auto-target (and (boolean? target) target))
       (if target
         (if auto-target
           (filter-map
             (l (e)
-              (let (target (client-template-target e target-name))
+              (let (target (client-template-target e type))
                 (if (and (file-exists? target) (not (config-ref development)))
                   (swa-full-path->app-path target)
                   (let
-                    ( (translate (hashtable-ref lang->translate lang))
+                    ( (pre-process-one (hashtable-ref lang->pre-process-one lang))
                       (post-process (hashtable-ref lang->post-process lang)))
-                    (ensure-directory-structure (dirname target))
-                    (if-pass (client-template-source e source-suffix)
-                      (l (source)
+                    (if-pass (client-template-source e type)
+                      (l (source) (ensure-directory-structure (dirname target))
                         (call-with-output-file target
                           (l (port)
-                            (template-fold (l (e result) (translate e port) result) source
+                            (template-fold (l (e result) (pre-process-one e port) result) source
                               bindings env target)))
                         (if post-process (post-process target)) (swa-full-path->app-path target)))))))
             source)
           (each
-            (let (translate (hashtable-ref lang->translate lang))
+            (let (pre-process-one (hashtable-ref lang->pre-process-one lang))
               (l (e)
-                (if-pass (client-template-source e source-suffix)
+                (if-pass (client-template-source e type)
                   (l (source)
-                    (template-fold (l (e result) (translate e target)) source bindings env #f)))))
+                    (template-fold (l (e result) (pre-process-one e target)) source bindings env #f)))))
             source))
         (apply append
           (map
             (l (e)
-              (if-pass (client-template-source e source-suffix)
+              (if-pass (client-template-source e type)
                 (template-fold pair source bindings env (list))))
             source)))))
 
   (define (client-html target bindings . sources)
     "port alist-q template-source ... ->
     displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
-    (display "<!doctype html>" target) (apply client-templates target (q sxml) bindings sources))
+    (display "<!doctype html>" target) (apply client-templates target (q html) bindings sources))
 
   (define (client-script bindings . sources)
     "alist-q template-source ... -> string
     evaluates sources as sescript"
-    (apply client-templates #t (q sescript) bindings sources))
+    (apply client-templates #t (q script) bindings sources))
 
   (define (client-style bindings . sources)
     "alist-q template-source ... -> string
     evaluates sources as plcss"
-    (apply client-templates #t (q plcss) bindings sources)))
+    (apply client-templates #t (q style) bindings sources)))

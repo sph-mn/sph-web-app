@@ -28,7 +28,8 @@
       ""))
 
   (define (sxhtml-includes-proc static-style dynamic-style static-script dynamic-script)
-    "creates a procedure that serves or processes given assets by default, and additional ones if given as arguments. dynamic means templates that are compiled, static are just path references
+    "creates a procedure that serves or processes given some assets by default, and additional ones given as arguments.
+    dynamic means templates that are compiled, static are just path references
     initialisation: (define sxhtml-include (sxhtml-includes-proc (list) (list \"lib/client/one\") (list) (list)))
     usage: (sxhtml-include (q style) ref)"
     (let
