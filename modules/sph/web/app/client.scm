@@ -1,14 +1,6 @@
 (library (sph web app client)
   (export
-    client-delete-all-compiled-files
-    client-html
-    client-lang->env
-    client-script
-    client-style
-    client-templates
-    lang->pre-process-one
-    lang->source-suffix
-    lang->target-name)
+    client-ac-config)
   (import
     (guile)
     (ice-9 ftw)
@@ -34,163 +26,135 @@
     (only (srfi srfi-1) filter-map))
 
   ;client-code processing
+  (define (has-suffix-proc suffix) (l (a) (string-suffix? suffix a)))
+  (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
   (define default-env (apply environment (ql (rnrs base) (sph))))
+  (define uglifyjs-installed? (search-env-path-variable "uglifyjs"))
+  (define cleancss-installed? (search-env-path-variable "cleancss"))
+  (define cssbeautify-installed? (search-env-path-variable "cssbeautify-cli"))
+  (define html-installed? (search-env-path-variable "html"))
 
-  (define-as type->suffixes-ht symbol-hashtable
-    script (list ".sjs" ".js") style (list ".plcss" ".css") html (list ".sxml" ".html"))
+  (define javascript-output-compress
+    (if uglifyjs-installed?
+      (l (config sources port)
+        (process-create-chain-with-pipes sources port
+          output-sources-copy (list "uglifyjs" "--compress" "--mangle" "--screw-ie8")))
+      ac-output-copy))
 
-  (define (type->suffixes type) (hashtable-ref type->suffixes-ht type (list "")))
+  (define javascript-output-format
+    (if uglifyjs-installed?
+      (l (config sources port)
+        (process-create-chain-with-pipes sources port
+          output-sources-copy (list "uglifyjs" "--beautify")))
+      ac-output-copy))
 
-  (define-as suffix->lang alist-q
-    ".css" css ".plcss" plcss ".sjs" sescript ".js" javascript ".html" html ".sxml" sxml)
+  (define css-output-compress
+    (if cleanss-installed?
+      (l (config sources port)
+        (process-create-chain-with-pipes sources port output-sources-copy (list "clean-css")))
+      ac-output-copy))
 
-  (define (file-name->lang a)
-    (any
-      (l (suffix-and-lang) (and (string-suffix? (first suffix-and-lang) a) (tail suffix-and-lang)))
-      suffix->lang))
+  (define css-output-format
+    (if cssbeautify-installed?
+      (l (config sources port)
+        (process-create-chain-with-pipes sources port
+          output-sources-copy (list "cssbeautify-cli" "--stdin" "--indent=2")))
+      ac-output-copy))
 
-  (define-as suffix->pre-process-one symbol-hashtable
-    ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
-    ".sjs" (l (a port) (sescript-use-strict port) (sescript->ecmascript a port))
-    ".plcss" plcss->css sxml sxml->xml)
+  (define html-output-format
+    (if html-installed?
+      (l (config sources port)
+        (process-create-chain-with-pipes sources port output-sources-copy (list "html")))
+      ac-output-copy))
 
-  (define-as lang->env symbol-hashtable
-    ;templates are evaluated with their own environments for inline-code/unquote evaluation
-    sescript default-env plcss default-env sxml default-env)
+  (define (s-template-sxml->xml config sources port)
+    (template-fold (l (template-result . result) (sxml->xml template-result port) result)
+      (and config (hashtable-ref config (q template-bindings)))
+      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
 
-  (define client-script-post-process
-    (let (uglifyfs (search-env-path-variable "uglifyjs"))
-      (and uglifyfs
-        (l (local-path)
-          (let (temp-path (string-append local-path ".in")) (rename-file local-path temp-path)
-            (if (config-ref development)
-              (system
-                (string-join (list uglifyfs "--beautify" "--output" local-path temp-path) " "))
-              (system
-                (string-join
-                  (list uglifyfs "--compress"
-                    "--mangle" "--screw-ie8" "--output" local-path temp-path)
-                  " ")))
-            (delete-file temp-path))))))
-
-  (define-as lang->post-process symbol-hashtable
-    ;these procedures translate the sxml result that (lang template) produces into the target format (strings usually)
-    sescript client-script-post-process)
-
-  (define-syntax-rule (path-add-branch-prefix a)
-    ;"string -> string"
-    (if (string-prefix? "lib" a) "" "branch/"))
-
-  (define (search-path a)
-    "string -> string/false
-    search in swa-paths to complete a relative path"
-    (any (l (e) (let (path (string-append e a)) (if (file-exists? path) path #f))) swa-paths))
-
-  (define (relative-source->path a type)
+  (define (s-template-sescript->javascript config sources port)
+    "sescript compilation with s-template support"
     (let
-      (create-path
-        (pair? a
-          (l (suffix)
-            (string-append (path-add-branch-prefix (first a)) (first a) "/client/" (tail a) suffix))
-          (l (suffix) (string-append (path-add-branch-prefix a) a suffix))))
-      (any
-        (l (suffix)
-          (let* ((path (create-path suffix)) (path-found (search-path path)))
-            (identity-if path-found
-              (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
-        (type->suffixes type))))
+      (sescript-load-paths
+        (or (and config (hashtable-ref config (q sescript-load-paths))) ses-default-load-paths))
+      (template-fold
+        (l (template-result . result)
+          (sescript->ecmascript template-result port sescript-load-paths) result)
+        (and config (hashtable-ref config (q template-bindings)))
+        (or (and config (hashtable-ref config (q template-environment))) default-env) sources)))
 
-  (define (directory-fold path proc init)
-    (let (d (if (string? path) (opendir path) path))
-      (let loop ((e (readdir d)) (result init))
-        (if (eof-object? e) result (loop (readdir d) (proc e result))))))
+  (define (s-template-plcss->css config sources port)
+    (template-fold (l (template-result . result) (plcss->css template-result port) result)
+      (and config (hashtable-ref config (q template-bindings)))
+      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
+
+  ;todo: test sxml compile / sxml composition / css compile, re-create client-*, (display "<!doctype html>" target)
+
+  (define-as client-ac-config symbol-hashtable
+    javascript
+    (list
+      (symbol-hashtable production javascript-output-compress development javascript-output-format)
+      (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
+    html
+    (list (symbol-hashtable)
+      (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->xml))
+    css
+    (pair (symbol-hashtable production css-output-compress development css-output-format)
+      (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
+
+  (define-as client-format->suffixes symbol-hashtable
+    javascript (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
+
+  (define client-target-directory (string-append swa-root "root/"))
 
   (define (client-delete-all-compiled-files)
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
-      (l (e)
-        (let (path (string-append swa-root "root/" e "/"))
+      (l (format)
+        (let (path (string-append client-target-directory format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
-      (vector->list (hashtable-values lang->type))))
+      (map symbol->string (vector->list (hashtable-keys client-ac-config)))))
 
-  (define (client-template-target source type)
-    "any:template-source string -> string:path
-    creates the full target path for one compiled template file"
-    (string-append swa-root "root/" type "/_" (number->string (equal-hash source) 32)))
+  (define (path-relative->path-full path format)
+    (identity-if
+      (or (swa-search-load-paths path)
+        (any (l (suffix) (swa-search-load-paths (string-append path suffix)))
+          (client-format->suffixes format)))
+      (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f)))
 
-  (define (client-template-source source type)
-    "template-source string -> template-source
-    convert relative paths in template-source to full-paths.
-    source can be a pair of the form (path-prefix . path-suffix),
-    called context, which is used to create a path with an automatically determined infix"
+  (define (client-prepare-input-spec output-format input-spec enter-list?)
     (every-map
       (l (merged)
-        (if (string? merged)
-          (if (string-prefix? "/" merged) merged (relative-source->path merged type))
-          (if (pair? merged)
-            (if (list? merged)
-              (map
-                (l (wrapped)
-                  (if (string? wrapped) (relative-source->path wrapped type)
-                    (if (pair? wrapped)
-                      (if (list? wrapped) wrapped (relative-source->path wrapped type)) wrapped)))
-                merged)
-              (relative-source->path merged type))
-            merged)))
-      (any->list-s source)))
+        (cond
+          ( (string? merged)
+            (if (string-prefix? "/" merged) merged (path-relative->path-full merged output-format)))
+          ( (list? merged) (client-prepare-source-spec-one output-format merged #f)
+            ((pair? merged) (path-relative->path-full merged output-format))))
+        input-spec)))
 
+  ;--
   (define-syntax-rule (swa-full-path->app-path a) (string-drop a (+ (string-length swa-root) 4)))
+  (define (client-port port-output target-format bindings . source))
+  (define (client-file target-format bindings . source))
 
-  (define (client-templates target type bindings . source)
-    "boolean/port:target symbol alist list ... -> datum/list:paths/unspecified
-    the template-handler used by client-html/script/style.
-    uses the (sph lang template) source format and extends it with"
-    (let (auto-target (and (boolean? target) target))
-      (if target
-        (if auto-target
-          (filter-map
-            (l (e)
-              (let (target (client-template-target e type))
-                (if (and (file-exists? target) (not (config-ref development)))
-                  (swa-full-path->app-path target)
-                  (let
-                    ( (pre-process-one (hashtable-ref lang->pre-process-one lang))
-                      (post-process (hashtable-ref lang->post-process lang)))
-                    (if-pass (client-template-source e type)
-                      (l (source) (ensure-directory-structure (dirname target))
-                        (call-with-output-file target
-                          (l (port)
-                            (template-fold (l (e result) (pre-process-one e port) result) source
-                              bindings env target)))
-                        (if post-process (post-process target)) (swa-full-path->app-path target)))))))
-            source)
-          (each
-            (let (pre-process-one (hashtable-ref lang->pre-process-one lang))
-              (l (e)
-                (if-pass (client-template-source e type)
-                  (l (source)
-                    (template-fold (l (e result) (pre-process-one e target)) source bindings env #f)))))
-            source))
-        (apply append
-          (map
-            (l (e)
-              (if-pass (client-template-source e type)
-                (template-fold pair source bindings env (list))))
-            source)))))
-
-  (define (client-html target bindings . sources)
+  (define (client-html port-output bindings . sources)
     "port alist-q template-source ... ->
     displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
-    (display "<!doctype html>" target) (apply client-templates target (q html) bindings sources))
+    (apply client-port target (q html) bindings sources))
 
-  (define (client-script bindings . sources)
+  (define (client-html bindings . sources)
+    "port alist-q template-source ... ->
+    displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
+    (apply client-templates target (q html) bindings sources))
+
+  (define (client-script-file bindings . sources)
     "alist-q template-source ... -> string
     evaluates sources as sescript"
     (apply client-templates #t (q script) bindings sources))
 
-  (define (client-style bindings . sources)
+  (define (client-style-file bindings . sources)
     "alist-q template-source ... -> string
     evaluates sources as plcss"
     (apply client-templates #t (q style) bindings sources)))
