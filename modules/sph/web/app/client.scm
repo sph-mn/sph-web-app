@@ -30,44 +30,46 @@
   ;client-code processing
   (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
   (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
-  (define-syntax-rule (client-target-directory) (string-append swa-root "root/"))
+  (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
   (define default-env (apply environment (ql (rnrs base) (sph))))
-  (define uglifyjs-installed? (search-env-path-variable "uglifyjs"))
-  (define cleancss-installed? (search-env-path-variable "cleancss"))
-  (define cssbeautify-installed? (search-env-path-variable "cssbeautify-cli"))
-  (define html-installed? (search-env-path-variable "html"))
+  (define path-uglifyjs (search-env-path-variable "uglifyjs"))
+  (define path-cleancss (search-env-path-variable "cleancss"))
+  (define path-cssbeautify (search-env-path-variable "cssbeautify-cli"))
+  (define path-html (search-env-path-variable "html"))
 
   (define javascript-output-compress
-    (if uglifyjs-installed?
+    (if path-uglifyjs
       (l (config sources port)
         (process-create-chain-with-pipes sources port
-          output-sources-copy (list "uglifyjs" "--compress" "--mangle" "--screw-ie8")))
+          (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8")))
       ac-output-copy))
 
   (define javascript-output-format
-    (if uglifyjs-installed?
+    (if path-uglifyjs
       (l (config sources port)
         (process-create-chain-with-pipes sources port
-          output-sources-copy (list "uglifyjs" "--beautify")))
+          (output-sources-copy sources) (list path-uglifyjs "--beautify")))
       ac-output-copy))
 
   (define css-output-compress
-    (if cleancss-installed?
+    (if path-cleancss
       (l (config sources port)
-        (process-create-chain-with-pipes sources port output-sources-copy (list "clean-css")))
+        (process-create-chain-with-pipes sources port
+          (output-sources-copy sources) (list path-cleancss)))
       ac-output-copy))
 
   (define css-output-format
-    (if cssbeautify-installed?
+    (if path-cssbeautify
       (l (config sources port)
         (process-create-chain-with-pipes sources port
-          output-sources-copy (list "cssbeautify-cli" "--stdin" "--indent=2")))
+          (output-sources-copy sources) (list path-cssbeautify "--stdin" "--indent=2")))
       ac-output-copy))
 
   (define html-output-format
-    (if html-installed?
+    (if path-html
       (l (config sources port)
-        (process-create-chain-with-pipes sources port output-sources-copy (list "html")))
+        (process-create-chain-with-pipes sources port
+          (output-sources-copy sources) (list path-html)))
       ac-output-copy))
 
   (define (s-template-sxml->html config sources port) (display "<!doctype html>" port)
@@ -100,7 +102,7 @@
     (list (symbol-hashtable)
       (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
-    (pair (symbol-hashtable production css-output-compress development css-output-format)
+    (list (symbol-hashtable production css-output-compress development css-output-format)
       (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   (define-as client-format->suffixes-ht symbol-hashtable
@@ -113,7 +115,7 @@
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
       (l (format)
-        (let (path (string-append (client-target-directory) format "/"))
+        (let (path (string-append (client-output-directory) format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
@@ -134,29 +136,32 @@
           ((and (list? a) enter-list?) (client-prepare-input-spec a output-format #f)) (else a)))
       input-spec))
 
-  (define (swa-mode-get) (if (config-ref (q development)) (q development) (q production)))
+  (define (swa-mode-get) (if (config-ref development) (q development) (q production)))
 
   (define (client-port port-output output-format bindings input-spec)
     (let (input-spec (client-prepare-input-spec input-spec output-format #t))
       (and input-spec
         (ac-compile client-ac-config (swa-mode-get)
-          port-output output-format (symbol-hashtable template-bindings bindings)))))
+          port-output output-format input-spec (symbol-hashtable template-bindings bindings)))))
 
   (define (client-file output-format bindings input-spec)
     (let
-      ((mode (swa-mode-get)) (input-spec (client-prepare-input-spec input-spec output-format #t)))
+      ( (output-directory (client-output-directory)) (mode (swa-mode-get))
+        (input-spec (client-prepare-input-spec input-spec output-format #t)))
       (and input-spec
-        (ac-compile->file client-ac-config mode
-          (client-target-directory) output-format
-          input-spec #:only-if-newer
-          (equal? mode (q development)) #:processor-config
-          (symbol-hashtable template-bindings bindings)))))
+        (if-pass
+          (ac-compile->file client-ac-config mode
+            output-directory output-format
+            input-spec #:only-if-newer
+            (equal? mode (q production)) #:processor-config
+            (symbol-hashtable template-bindings bindings))
+          (l (a) (string-append "/" (string-drop-prefix output-directory a)))))))
 
   (define (client-javascript port bindings . sources)
     (client-port port (q javascript) bindings sources))
 
-  (define (client-css port bindings . sources) (client-port port (q style) bindings sources))
+  (define (client-css port bindings . sources) (client-port port (q css) bindings sources))
   (define (client-html port bindings . sources) (client-port port (q html) bindings sources))
   (define (client-javascript-file bindings . sources) (client-file (q javascript) bindings sources))
-  (define (client-css-file bindings . sources) (client-file (q style) bindings sources))
+  (define (client-css-file bindings . sources) (client-file (q css) bindings sources))
   (define (client-html-file bindings . sources) (client-file (q html) bindings sources)))

@@ -7,6 +7,7 @@
   (import
     (rnrs base)
     (sph)
+    (sph conditional)
     (sph documentation)
     (sph hashtable)
     (sph web app)
@@ -40,7 +41,10 @@
             (syntax-rule (format ref static dynamic client-file create-include-sxml)
               (append static
                 (map create-include-sxml
-                  (append (apply client-file #f dynamic) (ref format (list))))))))
+                  (append
+                    (if (null? dynamic) dynamic
+                      (if-pass (apply client-file #f dynamic) list (list)))
+                    (if-pass (ref format #f) list (list))))))))
         (l (format ref)
           (if (equal? (q css) format)
             (get-sxml format ref static-css dynamic-css client-css-file sxhtml-include-css)
