@@ -121,6 +121,8 @@
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
       (map symbol->string (vector->list (hashtable-keys client-ac-config)))))
 
+  ;todo: support load-paths
+
   (define (path-relative->path-full path format)
     (identity-if
       (or (swa-search-load-paths path)
