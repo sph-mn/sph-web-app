@@ -27,24 +27,25 @@
         (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
       ""))
 
-  (define (sxhtml-includes-proc static-style dynamic-style static-script dynamic-script)
+  (define (sxhtml-includes-proc static-css dynamic-css static-javascript dynamic-javascript)
     "creates a procedure that serves or processes given some assets by default, and additional ones given as arguments.
     dynamic means templates that are compiled, static are just path references
     initialisation: (define sxhtml-include (sxhtml-includes-proc (list) (list \"lib/client/one\") (list) (list)))
-    usage: (sxhtml-include (q style) ref)"
+    usage: (sxhtml-include (q css) ref)"
     (let
-      ( (static-style (map sxhtml-include-style static-style))
-        (static-script (map sxhtml-include-script static-script)))
+      ( (static-css (map sxhtml-include-css static-css))
+        (static-javascript (map sxhtml-include-javascript static-javascript)))
       (let-syntax
         ( (get-sxml
-            (syntax-rule (type ref static dynamic prepare-dynamic create-include-sxml)
+            (syntax-rule (format ref static dynamic client-file create-include-sxml)
               (append static
                 (map create-include-sxml
-                  (append (apply prepare-dynamic #f dynamic) (ref type (list))))))))
-        (l (type ref)
-          (if (eqv? (q style) type)
-            (get-sxml type ref static-style dynamic-style client-style sxhtml-include-style)
-            (get-sxml type ref static-script dynamic-script client-script sxhtml-include-script))))))
+                  (append (apply client-file #f dynamic) (ref format (list))))))))
+        (l (format ref)
+          (if (equal? (q css) format)
+            (get-sxml format ref static-css dynamic-css client-css-file sxhtml-include-css)
+            (get-sxml format ref
+              static-javascript dynamic-javascript client-javascript-file sxhtml-include-javascript))))))
 
   (define (call-hook hook-procedures hook-name . a)
     "rnrs-hashtable symbol procedure-arguments ... -> any

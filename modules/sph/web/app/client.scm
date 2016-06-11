@@ -1,33 +1,36 @@
 (library (sph web app client)
   (export
-    client-ac-config)
+    client-ac-config
+    client-css
+    client-css-file
+    client-delete-compiled-files
+    client-file
+    client-html
+    client-html-file
+    client-javascript
+    client-javascript-file
+    client-port)
   (import
-    (guile)
-    (ice-9 ftw)
     (rnrs base)
     (rnrs eval)
-    (sph)
-    (sph alist)
-    (sph conditional)
+    (sph common)
     (sph config)
-    (sph filesystem)
-    (sph hashtable)
+    (sph filesystem asset-compiler)
     (sph lang plcss)
     (sph lang sescript)
     (sph lang template)
-    (sph list)
     (sph log)
-    (sph tree)
-    (sph web app config)
+    (sph record)
+    (sph web app base)
     (sxml simple)
-    (only (rnrs hashtables) equal-hash)
-    (only (sph process) process-create-chain-with-pipes)
-    (only (sph two) search-env-path-variable)
-    (only (srfi srfi-1) filter-map))
+    (except (rnrs hashtables) hashtable-ref)
+    (only (sph two) search-env-path-variable))
 
+  ;todo: test sxml compile / sxml composition / css compile,
   ;client-code processing
-  (define (has-suffix-proc suffix) (l (a) (string-suffix? suffix a)))
+  (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
   (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
+  (define-syntax-rule (client-target-directory) (string-append swa-root "root/"))
   (define default-env (apply environment (ql (rnrs base) (sph))))
   (define uglifyjs-installed? (search-env-path-variable "uglifyjs"))
   (define cleancss-installed? (search-env-path-variable "cleancss"))
@@ -49,7 +52,7 @@
       ac-output-copy))
 
   (define css-output-compress
-    (if cleanss-installed?
+    (if cleancss-installed?
       (l (config sources port)
         (process-create-chain-with-pipes sources port output-sources-copy (list "clean-css")))
       ac-output-copy))
@@ -67,7 +70,7 @@
         (process-create-chain-with-pipes sources port output-sources-copy (list "html")))
       ac-output-copy))
 
-  (define (s-template-sxml->xml config sources port)
+  (define (s-template-sxml->html config sources port) (display "<!doctype html>" port)
     (template-fold (l (template-result . result) (sxml->xml template-result port) result)
       (and config (hashtable-ref config (q template-bindings)))
       (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
@@ -88,8 +91,6 @@
       (and config (hashtable-ref config (q template-bindings)))
       (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
 
-  ;todo: test sxml compile / sxml composition / css compile, re-create client-*, (display "<!doctype html>" target)
-
   (define-as client-ac-config symbol-hashtable
     javascript
     (list
@@ -97,21 +98,22 @@
       (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
     html
     (list (symbol-hashtable)
-      (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->xml))
+      (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
     (pair (symbol-hashtable production css-output-compress development css-output-format)
       (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
-  (define-as client-format->suffixes symbol-hashtable
+  (define-as client-format->suffixes-ht symbol-hashtable
     javascript (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
 
-  (define client-target-directory (string-append swa-root "root/"))
+  (define-syntax-rule (client-format->suffixes format)
+    (hashtable-ref client-format->suffixes-ht format (list)))
 
-  (define (client-delete-all-compiled-files)
+  (define (client-delete-compiled-files)
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
       (l (format)
-        (let (path (string-append client-target-directory format "/"))
+        (let (path (string-append (client-target-directory) format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
@@ -124,37 +126,37 @@
           (client-format->suffixes format)))
       (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f)))
 
-  (define (client-prepare-input-spec output-format input-spec enter-list?)
+  (define (client-prepare-input-spec input-spec output-format enter-list?)
     (every-map
-      (l (merged)
+      (l (a)
         (cond
-          ( (string? merged)
-            (if (string-prefix? "/" merged) merged (path-relative->path-full merged output-format)))
-          ( (list? merged) (client-prepare-source-spec-one output-format merged #f)
-            ((pair? merged) (path-relative->path-full merged output-format))))
-        input-spec)))
+          ((string? a) (if (string-prefix? "/" a) a (path-relative->path-full a output-format)))
+          ((and (list? a) enter-list?) (client-prepare-input-spec a output-format #f)) (else a)))
+      input-spec))
 
-  ;--
-  (define-syntax-rule (swa-full-path->app-path a) (string-drop a (+ (string-length swa-root) 4)))
-  (define (client-port port-output target-format bindings . source))
-  (define (client-file target-format bindings . source))
+  (define (swa-mode-get) (if (config-ref (q development)) (q development) (q production)))
 
-  (define (client-html port-output bindings . sources)
-    "port alist-q template-source ... ->
-    displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
-    (apply client-port target (q html) bindings sources))
+  (define (client-port port-output output-format bindings input-spec)
+    (let (input-spec (client-prepare-input-spec input-spec output-format #t))
+      (and input-spec
+        (ac-compile client-ac-config (swa-mode-get)
+          port-output output-format (symbol-hashtable template-bindings bindings)))))
 
-  (define (client-html bindings . sources)
-    "port alist-q template-source ... ->
-    displays an html <!doctype html> doctype and writes the results of evaluating template-sources to target"
-    (apply client-templates target (q html) bindings sources))
+  (define (client-file output-format bindings input-spec)
+    (let
+      ((mode (swa-mode-get)) (input-spec (client-prepare-input-spec input-spec output-format #t)))
+      (and input-spec
+        (ac-compile->file client-ac-config mode
+          (client-target-directory) output-format
+          input-spec #:only-if-newer
+          (equal? mode (q development)) #:processor-config
+          (symbol-hashtable template-bindings bindings)))))
 
-  (define (client-script-file bindings . sources)
-    "alist-q template-source ... -> string
-    evaluates sources as sescript"
-    (apply client-templates #t (q script) bindings sources))
+  (define (client-javascript port bindings . sources)
+    (client-port port (q javascript) bindings sources))
 
-  (define (client-style-file bindings . sources)
-    "alist-q template-source ... -> string
-    evaluates sources as plcss"
-    (apply client-templates #t (q style) bindings sources)))
+  (define (client-css port bindings . sources) (client-port port (q style) bindings sources))
+  (define (client-html port bindings . sources) (client-port port (q html) bindings sources))
+  (define (client-javascript-file bindings . sources) (client-file (q javascript) bindings sources))
+  (define (client-css-file bindings . sources) (client-file (q style) bindings sources))
+  (define (client-html-file bindings . sources) (client-file (q html) bindings sources)))

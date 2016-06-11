@@ -2,11 +2,14 @@
   (export
     branch-ref
     branch-route-path
+    client-file
     client-html
-    client-lang->env
-    client-script
-    client-style
-    client-templates
+    client-html-file
+    client-port
+    client-javascript
+    client-javascript-file
+    client-css
+    client-css-file
     config-ref
     config-set!
     headers-content-length
@@ -25,6 +28,7 @@
     swa-project-name
     swa-request
     swa-root
+    swa-search-load-paths
     swa-start
     swa-start-http
     swa-start-scgi)
@@ -40,8 +44,8 @@
     (sph hashtable)
     (sph log)
     (sph scgi)
+    (sph web app base)
     (sph web app client)
-    (sph web app config)
     (sph web app http)
     (sph web http)
     (web http)
@@ -61,9 +65,6 @@
     (only (sph server) server-create-bound-socket)
     (only (sph string) string-longest-prefix)
     (only (srfi srfi-1) last))
-
-  (define-syntax-rule (swa-search-load-paths a)
-    (any (l (e) (let (path (string-append e a)) (if (file-exists? path) path #f))) swa-paths))
 
   (define-syntax-rule (swa-path->module-name a)
     (let (path (swa-search-load-paths a))
