@@ -123,20 +123,40 @@
 
   ;todo: support load-paths
 
+  (define (path-add-prefix a format)
+    (let (prefix (string-append "client/" (symbol->string format) "/"))
+      (if (string-prefix? "lib/" a) (string-append prefix a) (string-append prefix "branch/" a))))
+
   (define (path-relative->path-full path format)
-    (identity-if
-      (or (swa-search-load-paths path)
-        (any (l (suffix) (swa-search-load-paths (string-append path suffix)))
-          (client-format->suffixes format)))
-      (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f)))
+    (let (path (path-add-prefix path format))
+      (identity-if
+        (or (swa-search-load-paths path)
+          (any (l (suffix) (swa-search-load-paths (string-append path suffix)))
+            (client-format->suffixes format)))
+        (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
+
+  (define (path-pair->path-full a format)
+    "(string:load-path-suffix . string:path) symbol -> false/string"
+    (let*
+      ( (load-path-suffix (ensure-trailing-slash (first a)))
+        (path-full
+          (any
+            (l (e)
+              (and (string-suffix? load-path-suffix e)
+                (string-append e (path-add-prefix (tail a) format))))
+            swa-paths)))
+      (if (and path-full (file-exists? path-full)) path-full
+        (begin (log-message (q error) (string-append "missing file \"" path-full "\"")) #f))))
 
   (define (client-prepare-input-spec input-spec output-format enter-list?)
-    (every-map
-      (l (a)
-        (cond
-          ((string? a) (if (string-prefix? "/" a) a (path-relative->path-full a output-format)))
-          ((and (list? a) enter-list?) (client-prepare-input-spec a output-format #f)) (else a)))
-      input-spec))
+    (and (not (null? input-spec))
+      (every-map
+        (l (a)
+          (cond
+            ((string? a) (if (string-prefix? "/" a) a (path-relative->path-full a output-format)))
+            ((list? a) (if enter-list? (client-prepare-input-spec a output-format #f) a))
+            ((pair? a) (path-pair->path-full a output-format)) (else a)))
+        input-spec)))
 
   (define (swa-mode-get) (if (config-ref development) (q development) (q production)))
 
