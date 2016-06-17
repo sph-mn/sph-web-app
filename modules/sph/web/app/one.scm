@@ -3,7 +3,7 @@
     call-hook
     nginx-respond-file
     nginx-respond-file-download
-    sxhtml-includes-proc)
+    shtml-includes-proc)
   (import
     (rnrs base)
     (sph)
@@ -12,7 +12,7 @@
     (sph hashtable)
     (sph web app)
     (sph web http)
-    (sph web sxhtml))
+    (sph web shtml))
 
   (define (nginx-respond-file path mime-type)
     "the path is always relative to a configured nginx location"
@@ -28,8 +28,8 @@
         (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
       ""))
 
-  (define (sxhtml-includes-proc sources-css sources-javascript)
-    "usage: (sxhtml-include (q css) ref)"
+  (define (shtml-includes-proc sources-css sources-javascript)
+    "usage: (shtml-include (q css) ref)"
     (let-syntax
       ( (get-sxml
           (syntax-rule (format ref sources client-file create-include-sxml)
@@ -38,8 +38,8 @@
                 (if-pass (ref format #f) list (list)))))))
       (l (format ref)
         (if (equal? (q css) format)
-          (get-sxml format ref sources-css client-css-file sxhtml-include-css)
-          (get-sxml format ref sources-javascript client-javascript-file sxhtml-include-javascript)))))
+          (get-sxml format ref sources-css client-css-file shtml-include-css)
+          (get-sxml format ref sources-javascript client-javascript-file shtml-include-javascript)))))
 
   (define (call-hook hook-procedures hook-name . a)
     "rnrs-hashtable symbol procedure-arguments ... -> any

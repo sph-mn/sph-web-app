@@ -121,11 +121,7 @@
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
       (map symbol->string (vector->list (hashtable-keys client-ac-config)))))
 
-  ;todo: support load-paths
-
-  (define (path-add-prefix a format)
-    (let (prefix (string-append "client/" (symbol->string format) "/"))
-      (if (string-prefix? "lib/" a) (string-append prefix a) (string-append prefix "branch/" a))))
+  (define (path-add-prefix a format) (string-append "client/" (symbol->string format) "/" a))
 
   (define (path-relative->path-full path format)
     (let (path (path-add-prefix path format))
