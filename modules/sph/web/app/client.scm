@@ -14,6 +14,7 @@
     (rnrs base)
     (rnrs eval)
     (sph common)
+    (only (guile) current-output-port)
     (sph config)
     (sph filesystem asset-compiler)
     (sph lang plcss)
