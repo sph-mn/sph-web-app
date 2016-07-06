@@ -2,14 +2,14 @@
   (export
     branch-ref
     branch-route-path
+    client-css
+    client-css-file
     client-file
     client-html
     client-html-file
-    client-port
     client-javascript
     client-javascript-file
-    client-css
-    client-css-file
+    client-port
     config-ref
     config-set!
     headers-content-length
@@ -190,7 +190,7 @@
           (q search-paths) %load-path (q guessed-root-directory) swa-root))))
 
   (define (swa-initialise-config config) (config-load swa-default-config)
-    (catch (if config (q none) (q configuration-file-does-not-exist)) (l () (config-load config))
+    (catch (if config (q none) (q configuration-file-does-not-exist)) (thunk (config-load config))
       (l args #f)))
 
   (define (default-server-error-handler key resume . args) (log-message (q error) (pair key args))
@@ -225,8 +225,8 @@
             (listen-port (config-ref listen-port)))
           (call-with-socket listen-address listen-port
             (l (socket) (start-message listen-address listen-port)
-              (if (config-ref development)
-                ;single-threaded without exception handler
+              (if (or (config-ref single-threaded) (config-ref development))
+                ;single-threaded without extra exception handler
                 (scgi-handle-requests
                   (l (headers client) (http-respond headers client app-respond)) socket 1)
                 ;possibly multi-threaded and all exceptions catched for continuous processing

@@ -14,7 +14,6 @@
     (rnrs base)
     (rnrs eval)
     (sph common)
-    (only (guile) current-output-port)
     (sph config)
     (sph filesystem asset-compiler)
     (sph lang plcss)
@@ -25,6 +24,7 @@
     (sph web app base)
     (sxml simple)
     (except (rnrs hashtables) hashtable-ref)
+    (only (guile) current-output-port)
     (only (sph two) search-env-path-variable))
 
   ;todo: test sxml compile / sxml composition / css compile,
@@ -32,6 +32,7 @@
   (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
   (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
   (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
+  (define-syntax-rule (client-output-path) "assets/")
   (define default-env (apply environment (ql (rnrs base) (sph))))
   (define path-uglifyjs (search-env-path-variable "uglifyjs"))
   (define path-cleancss (search-env-path-variable "cleancss"))
@@ -116,7 +117,7 @@
     "deletes all previously generated client-code files to remove old files that would not be generated again"
     (each
       (l (format)
-        (let (path (string-append (client-output-directory) format "/"))
+        (let (path (string-append (client-output-directory) (client-output-path) format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
@@ -170,7 +171,7 @@
       (and input-spec
         (if-pass
           (ac-compile->file client-ac-config mode
-            output-directory output-format
+            (string-append output-directory (client-output-path)) output-format
             input-spec #:only-if-newer
             (equal? mode (q production)) #:processor-config
             (symbol-hashtable template-bindings bindings))
