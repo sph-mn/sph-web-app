@@ -95,16 +95,18 @@
       (and config (hashtable-ref config (q template-bindings)))
       (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
 
+  ; ! all separate process processing disabled because process creation suddenly does not work anymore - no fork with multiple threads error
   (define-as client-ac-config symbol-hashtable
     javascript
-    (list
-      (symbol-hashtable production javascript-output-compress development javascript-output-format)
+    (list (symbol-hashtable)
+      ;(symbol-hashtable production javascript-output-compress development javascript-output-format)
       (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
     html
     (list (symbol-hashtable)
       (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
-    (list (symbol-hashtable production css-output-compress development css-output-format)
+    (list (symbol-hashtable)
+      ;(symbol-hashtable production css-output-compress development css-output-format)
       (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   (define-as client-format->suffixes-ht symbol-hashtable
