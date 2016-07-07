@@ -177,7 +177,6 @@
         "\n")))
 
   (define-syntax-rule (swa-initialise-library-prefix swa-root)
-    ;todo: check for malfunction because of different path prefixes in swa-paths to same destination directories because of symlink resolution
     (let*
       ( (library-prefix (path->module-name swa-root #t))
         (library-prefix
@@ -191,10 +190,10 @@
 
   (define (swa-initialise-config config) (config-load swa-default-config)
     (catch (if config (q none) (q configuration-file-does-not-exist)) (thunk (config-load config))
-      (l args #f)))
+      (l a #f)))
 
-  (define (default-server-error-handler key resume . args) (log-message (q error) (pair key args))
-    (resume))
+  (define (default-server-error-handler key resume socket . a) (log-message (q error) (pair key a))
+    (if (port-closed? socket) #f (resume)))
 
   (define-syntax-rule (local-socket-set-options address)
     (if (string-prefix? "/" address)
