@@ -27,7 +27,7 @@
     (only (guile) current-output-port)
     (only (sph two) search-env-path-variable))
 
-  ;client-code processing
+  ;client-code processing. see client-ac-config
   (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
   (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
   (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
@@ -41,36 +41,34 @@
   (define javascript-output-compress
     (if path-uglifyjs
       (l (config sources port)
-        (process-create-chain-with-pipes sources port
+        (process-create-chain-with-pipes #f port
           (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8")))
       ac-output-copy))
 
   (define javascript-output-format
     (if path-uglifyjs
       (l (config sources port)
-        (process-create-chain-with-pipes sources port
+        (process-create-chain-with-pipes #f port
           (output-sources-copy sources) (list path-uglifyjs "--beautify")))
       ac-output-copy))
 
   (define css-output-compress
     (if path-cleancss
       (l (config sources port)
-        (process-create-chain-with-pipes sources port
-          (output-sources-copy sources) (list path-cleancss)))
+        (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-cleancss)))
       ac-output-copy))
 
   (define css-output-format
     (if path-cssbeautify
       (l (config sources port)
-        (process-create-chain-with-pipes sources port
+        (process-create-chain-with-pipes #f port
           (output-sources-copy sources) (list path-cssbeautify "--stdin" "--indent=2")))
       ac-output-copy))
 
   (define html-output-format
     (if path-html
       (l (config sources port)
-        (process-create-chain-with-pipes sources port
-          (output-sources-copy sources) (list path-html)))
+        (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html)))
       ac-output-copy))
 
   (define (s-template-sxml->html config sources port) (display "<!doctype html>" port)
@@ -97,16 +95,13 @@
   (define-as client-ac-config symbol-hashtable
     javascript
     (list
-      (symbol-hashtable)
-      ;(symbol-hashtable production javascript-output-compress development javascript-output-format)
+      (symbol-hashtable production javascript-output-compress development javascript-output-format)
       (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
     html
     (list (symbol-hashtable)
       (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
-    (list
-      (symbol-hashtable)
-      ;(symbol-hashtable production css-output-compress development css-output-format)
+    (list (symbol-hashtable production css-output-compress development css-output-format)
       (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   (define-as client-format->suffixes-ht symbol-hashtable
