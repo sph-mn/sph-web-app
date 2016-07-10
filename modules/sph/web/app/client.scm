@@ -34,8 +34,8 @@
   (define-syntax-rule (client-output-path) "assets/")
   (define default-env (apply environment (ql (rnrs base) (sph))))
   (define path-uglifyjs (search-env-path-variable "uglifyjs"))
-  (define path-cleancss (search-env-path-variable "cleancss"))
-  (define path-cssbeautify (search-env-path-variable "cssbeautify-cli"))
+  ;there is clean-css, but clean-css does not format and cssbeautify-cli did not work at all
+  (define path-csstidy (search-env-path-variable "csstidy"))
   (define path-html (search-env-path-variable "html"))
 
   (define javascript-output-compress
@@ -53,16 +53,19 @@
       ac-output-copy))
 
   (define css-output-compress
-    (if path-cleancss
+    (if path-csstidy
       (l (config sources port)
-        (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-cleancss)))
+        (process-create-chain-with-pipes #f port
+          (output-sources-copy sources)
+          (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true"))))
       ac-output-copy))
 
   (define css-output-format
-    (if path-cssbeautify
+    (if path-csstidy
       (l (config sources port)
         (process-create-chain-with-pipes #f port
-          (output-sources-copy sources) (list path-cssbeautify "--stdin" "--indent=2")))
+          (output-sources-copy sources)
+          (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true"))))
       ac-output-copy))
 
   (define html-output-format

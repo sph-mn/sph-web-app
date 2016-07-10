@@ -14,22 +14,24 @@
     (sph web http)
     (sph web shtml))
 
-  (define (nginx-respond-file path mime-type)
-    "the path is always relative to a configured nginx location"
+  (define* (nginx-respond-file path #:optional mime-type)
+    "the path is always relative to a configured nginx location or root"
     (respond 200
-      (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type))
+      (append (list (http-header-line "x-accel-redirect" path))
+        (if mime-type (list (http-header-line "content-type" mime-type)) (list)))
       ""))
 
-  (define (nginx-respond-file-download path file-name mime-type)
+  (define* (nginx-respond-file-download path file-name #:optional mime-type)
     "like nginx-respond-file but adds a content-disposition header to suggest to the client
     that it should be treated as a download even if the client can display it"
     (respond 200
-      (list (http-header-line "x-accel-redirect" path) (http-header-line "content-type" mime-type)
-        (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
+      (append
+        (list (http-header-line "x-accel-redirect" path)
+          (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
+        (if mime-type (list (http-header-line "content-type" mime-type)) (list)))
       ""))
 
-  (define (shtml-includes-proc sources-css sources-javascript)
-    "usage: (shtml-include (q css) ref)"
+  (define (shtml-includes-proc sources-css sources-javascript) "usage: (shtml-include (q css) ref)"
     (let-syntax
       ( (get-sxml
           (syntax-rule (format ref sources client-file create-include-sxml)
