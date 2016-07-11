@@ -12,7 +12,8 @@
     (sph hashtable)
     (sph web app)
     (sph web http)
-    (sph web shtml))
+    (sph web shtml)
+    (only (sph string) string-quote))
 
   (define* (nginx-respond-file path #:optional mime-type)
     "the path is always relative to a configured nginx location or root"
@@ -27,7 +28,8 @@
     (respond 200
       (append
         (list (http-header-line "x-accel-redirect" path)
-          (http-header-line "content-disposition" (string-append "attachment;filename=" file-name)))
+          (http-header-line "content-disposition"
+            (string-append "attachment;filename=" (string-quote file-name))))
         (if mime-type (list (http-header-line "content-type" mime-type)) (list)))
       ""))
 
