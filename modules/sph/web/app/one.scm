@@ -7,6 +7,7 @@
   (import
     (rnrs base)
     (sph)
+    (only (sph list) any->list)
     (sph conditional)
     (sph documentation)
     (sph hashtable)
@@ -38,8 +39,8 @@
       ( (get-sxml
           (syntax-rule (format ref sources client-file create-include-sxml)
             (map create-include-sxml
-              (append (if-pass (apply client-file #f sources) list (list))
-                (if-pass (ref format #f) list (list)))))))
+              (append (if-pass (apply client-file #f sources) any->list (list))
+                (if-pass (ref format #f) any->list (list)))))))
       (l (format ref)
         (if (equal? (q css) format)
           (get-sxml format ref sources-css client-css-file shtml-include-css)
