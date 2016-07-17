@@ -41,37 +41,42 @@
   (define javascript-output-compress
     (if path-uglifyjs
       (l (config sources port)
-        (process-create-chain-with-pipes #f port
-          (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8")))
+        (every process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8"))))
       ac-output-copy))
 
   (define javascript-output-format
     (if path-uglifyjs
       (l (config sources port)
-        (process-create-chain-with-pipes #f port
-          (output-sources-copy sources) (list path-uglifyjs "--beautify")))
+        (every process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources) (list path-uglifyjs "--beautify"))))
       ac-output-copy))
 
   (define css-output-compress
     (if path-csstidy
       (l (config sources port)
-        (process-create-chain-with-pipes #f port
-          (output-sources-copy sources)
-          (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true"))))
+        (every process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources)
+            (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true")))))
       ac-output-copy))
 
   (define css-output-format
     (if path-csstidy
       (l (config sources port)
-        (process-create-chain-with-pipes #f port
-          (output-sources-copy sources)
-          (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true"))))
+        (every process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources)
+            (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true")))))
       ac-output-copy))
 
   (define html-output-format
     (if path-html
       (l (config sources port)
-        (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html)))
+        (every process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html))))
       ac-output-copy))
 
   (define (s-template-sxml->html config sources port) (display "<!doctype html>" port)
@@ -98,13 +103,16 @@
   (define-as client-ac-config symbol-hashtable
     javascript
     (list
+      ;(symbol-hashtable)
       (symbol-hashtable production javascript-output-compress development javascript-output-format)
       (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
     html
     (list (symbol-hashtable)
       (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
-    (list (symbol-hashtable production css-output-compress development css-output-format)
+    (list
+      ;(symbol-hashtable)
+      (symbol-hashtable production css-output-compress development css-output-format)
       (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   (define-as client-format->suffixes-ht symbol-hashtable
