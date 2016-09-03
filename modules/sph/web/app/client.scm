@@ -41,7 +41,7 @@
   (define javascript-output-compress
     (if path-uglifyjs
       (l (config sources port)
-        (every process-chain-finished-successfully?
+        (process-chain-finished-successfully?
           (process-create-chain-with-pipes #f port
             (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8"))))
       ac-output-copy))
@@ -49,7 +49,7 @@
   (define javascript-output-format
     (if path-uglifyjs
       (l (config sources port)
-        (every process-chain-finished-successfully?
+        (process-chain-finished-successfully?
           (process-create-chain-with-pipes #f port
             (output-sources-copy sources) (list path-uglifyjs "--beautify"))))
       ac-output-copy))
@@ -57,7 +57,7 @@
   (define css-output-compress
     (if path-csstidy
       (l (config sources port)
-        (every process-chain-finished-successfully?
+        (process-chain-finished-successfully?
           (process-create-chain-with-pipes #f port
             (output-sources-copy sources)
             (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true")))))
@@ -66,7 +66,7 @@
   (define css-output-format
     (if path-csstidy
       (l (config sources port)
-        (every process-chain-finished-successfully?
+        (process-chain-finished-successfully?
           (process-create-chain-with-pipes #f port
             (output-sources-copy sources)
             (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true")))))
@@ -75,7 +75,7 @@
   (define html-output-format
     (if path-html
       (l (config sources port)
-        (every process-chain-finished-successfully?
+        (process-chain-finished-successfully?
           (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html))))
       ac-output-copy))
 
