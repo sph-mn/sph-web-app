@@ -25,7 +25,7 @@
     (sxml simple)
     (except (rnrs hashtables) hashtable-ref)
     (only (guile) current-output-port)
-    (only (sph two) search-env-path-variable))
+    (only (sph one) search-env-path))
 
   ;client-code processing. see client-ac-config
   (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
@@ -33,10 +33,10 @@
   (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
   (define-syntax-rule (client-output-path) "assets/")
   (define default-env (apply environment (ql (rnrs base) (sph))))
-  (define path-uglifyjs (search-env-path-variable "uglifyjs"))
+  (define path-uglifyjs (search-env-path "uglifyjs"))
   ;there is clean-css, but clean-css does not format and cssbeautify-cli did not work at all
-  (define path-csstidy (search-env-path-variable "csstidy"))
-  (define path-html (search-env-path-variable "html"))
+  (define path-csstidy (search-env-path "csstidy"))
+  (define path-html (search-env-path "html"))
 
   (define javascript-output-compress
     (if path-uglifyjs
