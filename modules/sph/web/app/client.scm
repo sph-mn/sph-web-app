@@ -11,9 +11,8 @@
     client-javascript-file
     client-port)
   (import
-    (rnrs base)
     (rnrs eval)
-    (sph common)
+    (sph base)
     (sph config)
     (sph filesystem asset-compiler)
     (sph lang plcss)
@@ -23,97 +22,14 @@
     (sph record)
     (sph web app base)
     (sxml simple)
-    (except (rnrs hashtables) hashtable-ref)
-    (only (guile) current-output-port)
-    (only (sph one) search-env-path))
+    (only (guile) current-output-port))
 
-  ;client-code processing. see client-ac-config
-  (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
-  (define (output-sources-copy a) (thunk (each (l (a) (a (current-output-port))) a)))
+  (define sph-web-app-client-description "client-code processing")
+  ;
+  ; -- path preparation
+  ;
   (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
   (define-syntax-rule (client-output-path) "assets/")
-  (define default-env (apply environment (ql (rnrs base) (sph))))
-  (define path-uglifyjs (search-env-path "uglifyjs"))
-  ;there is clean-css, but clean-css does not format and cssbeautify-cli did not work at all
-  (define path-csstidy (search-env-path "csstidy"))
-  (define path-html (search-env-path "html"))
-
-  (define javascript-output-compress
-    (if path-uglifyjs
-      (l (config sources port)
-        (process-chain-finished-successfully?
-          (process-create-chain-with-pipes #f port
-            (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8"))))
-      ac-output-copy))
-
-  (define javascript-output-format
-    (if path-uglifyjs
-      (l (config sources port)
-        (process-chain-finished-successfully?
-          (process-create-chain-with-pipes #f port
-            (output-sources-copy sources) (list path-uglifyjs "--beautify"))))
-      ac-output-copy))
-
-  (define css-output-compress
-    (if path-csstidy
-      (l (config sources port)
-        (process-chain-finished-successfully?
-          (process-create-chain-with-pipes #f port
-            (output-sources-copy sources)
-            (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true")))))
-      ac-output-copy))
-
-  (define css-output-format
-    (if path-csstidy
-      (l (config sources port)
-        (process-chain-finished-successfully?
-          (process-create-chain-with-pipes #f port
-            (output-sources-copy sources)
-            (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true")))))
-      ac-output-copy))
-
-  (define html-output-format
-    (if path-html
-      (l (config sources port)
-        (process-chain-finished-successfully?
-          (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html))))
-      ac-output-copy))
-
-  (define (s-template-sxml->html config sources port) (display "<!doctype html>" port)
-    (template-fold (l (template-result . result) (sxml->xml template-result port) result)
-      (and config (hashtable-ref config (q template-bindings)))
-      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
-
-  (define (s-template-sescript->javascript config sources port)
-    "sescript compilation with s-template support"
-    (let
-      (sescript-load-paths
-        (or (and config (hashtable-ref config (q sescript-load-paths))) ses-default-load-paths))
-      (template-fold
-        (l (template-result . result)
-          (sescript->ecmascript template-result port sescript-load-paths) result)
-        (and config (hashtable-ref config (q template-bindings)))
-        (or (and config (hashtable-ref config (q template-environment))) default-env) sources)))
-
-  (define (s-template-plcss->css config sources port)
-    (template-fold (l (template-result . result) (plcss->css template-result port) result)
-      (and config (hashtable-ref config (q template-bindings)))
-      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
-
-  (define-as client-ac-config symbol-hashtable
-    javascript
-    (list
-      ;(symbol-hashtable)
-      (symbol-hashtable production javascript-output-compress development javascript-output-format)
-      (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
-    html
-    (list (symbol-hashtable)
-      (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
-    css
-    (list
-      ;(symbol-hashtable)
-      (symbol-hashtable production css-output-compress development css-output-format)
-      (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   (define-as client-format->suffixes-ht symbol-hashtable
     javascript (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
@@ -122,7 +38,8 @@
     (hashtable-ref client-format->suffixes-ht format (list)))
 
   (define (client-delete-compiled-files)
-    "deletes all previously generated client-code files to remove old files that would not be generated again"
+    "deletes all filles in the client data output directory with an underscore as prefix,
+     which should only be previously generated client-code files"
     (each
       (l (format)
         (let (path (string-append (client-output-directory) (client-output-path) format "/"))
@@ -131,7 +48,8 @@
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
       (map symbol->string (vector->list (hashtable-keys client-ac-config)))))
 
-  (define (path-add-prefix a format) (string-append "client/" (symbol->string format) "/" a))
+  (define (path-add-prefix a format) "string symbol -> string"
+    (string-append "client/" (symbol->string format) "/" a))
 
   (define (path-relative->path-full path format)
     (let (path (path-add-prefix path format))
@@ -154,6 +72,98 @@
       (if (and path-full (file-exists? path-full)) path-full
         (begin (log-message (q error) (string-append "missing file \"" path-full "\"")) #f))))
 
+  ;-- file processing
+  ;
+  (define (output-sources-copy a) (nullary (each (l (a) (a (current-output-port))) a)))
+  (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
+  (define default-env (apply environment (list-q (sph))))
+  (define path-uglifyjs (search-env-path "uglifyjs"))
+
+  (define path-csstidy
+    ;there is also clean-css, but it does not format and cssbeautify-cli did not work at all
+    (search-env-path "csstidy"))
+
+  (define path-html (search-env-path "html"))
+
+  (define javascript-output-compress
+    (if path-uglifyjs
+      (l (config sources port) "hashtable (string:path ...) port:out -> boolean"
+        (process-chain-finiss-success?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources) (list path-uglifyjs "--compress" "--mangle" "--screw-ie8"))))
+      #f))
+
+  (define javascript-output-format
+    (if path-uglifyjs
+      (l (config sources port)
+        (process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources) (list path-uglifyjs "--beautify"))))
+      #f))
+
+  (define css-output-compress
+    (if path-csstidy
+      (l (config sources port)
+        (process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources)
+            (list path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true")))))
+      #f))
+
+  (define css-output-format
+    (if path-csstidy
+      (l (config sources port)
+        (process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port
+            (output-sources-copy sources)
+            (list path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true")))))
+      #f))
+
+  (define html-output-format
+    (if path-html
+      (l (config sources port)
+        (process-chain-finished-successfully?
+          (process-create-chain-with-pipes #f port (output-sources-copy sources) (list path-html))))
+      #f))
+
+  (define (s-template-sxml->html config sources port) "hashtable list port -> string"
+    (display "<!doctype html>" port)
+    (template-fold (l (template-result . result) (sxml->xml template-result port) result)
+      (and config (hashtable-ref config (q template-bindings)))
+      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
+
+  (define (s-template-sescript->javascript config sources port)
+    "hashtable list port -> string
+     compile sescript from an s-template"
+    (let
+      (sescript-load-paths
+        (or (and config (hashtable-ref config (q sescript-load-paths))) ses-default-load-paths))
+      (template-fold
+        (l (template-result . result)
+          (sescript->ecmascript template-result port sescript-load-paths) result)
+        (and config (hashtable-ref config (q template-bindings)))
+        (or (and config (hashtable-ref config (q template-environment))) default-env) sources)))
+
+  (define (s-template-plcss->css config sources port)
+    "hashtable list port -> string
+     compile plcss from an s-template"
+    (template-fold (l (template-result . result) (plcss->css template-result port) result)
+      (and config (hashtable-ref config (q template-bindings)))
+      (or (and config (hashtable-ref config (q template-environment))) default-env) sources))
+
+  (define-as client-ac-config symbol-hashtable
+    ; the main configuration for the asset pipeline
+    javascript
+    (list
+      (symbol-hashtable production javascript-output-compress development javascript-output-format)
+      (record ac-lang-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
+    html
+    (list (symbol-hashtable)
+      (record ac-lang-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
+    css
+    (list (symbol-hashtable production css-output-compress development css-output-format)
+      (record ac-lang-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
+
   (define (client-prepare-input-spec input-spec output-format enter-list?)
     (and (not (null? input-spec))
       (every-map
@@ -164,7 +174,8 @@
             ((pair? a) (path-pair->path-full a output-format)) (else a)))
         input-spec)))
 
-  (define (swa-mode-get) (if (config-ref development) (q development) (q production)))
+  ;-- main exports
+  ;
 
   (define (client-port port-output output-format bindings input-spec)
     (let (input-spec (client-prepare-input-spec input-spec output-format #t))
@@ -185,7 +196,7 @@
             (symbol-hashtable template-bindings bindings))
           (l (a) (string-append "/" (string-drop-prefix output-directory a)))))))
 
-  (define (client-javascript port bindings . sources)
+  (define (client-javascript port bindings . sources) "port ? ? ->"
     (client-port port (q javascript) bindings sources))
 
   (define (client-css port bindings . sources) (client-port port (q css) bindings sources))

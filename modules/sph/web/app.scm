@@ -36,12 +36,10 @@
     (guile)
     (ice-9 match)
     (ice-9 threads)
-    (rnrs base)
     (rnrs bytevectors)
-    (sph)
+    (sph base)
     (sph conditional)
     (sph config)
-    (sph hashtable)
     (sph log)
     (sph scgi)
     (sph web app base)
@@ -52,19 +50,18 @@
     (web request)
     (web server)
     (web uri)
-    (only (sph alist) alist-ref)
-    (only (sph filesystem) path->list path->full-path)
+
     (only (sph module)
       module-ref-no-error
       call-if-defined
       path->module-name
       path->symbol-list
       find-modules)
-    (only (sph one) procedure->cached-procedure program-path)
+
     (only (sph process) shell-eval)
     (only (sph server) server-create-bound-socket)
-    (only (sph string) string-longest-prefix)
-    (only (srfi srfi-1) last))
+
+)
 
   (define-syntax-rule (swa-path->module-name a)
     (let (path (swa-search-load-paths a))
