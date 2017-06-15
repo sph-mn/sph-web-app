@@ -50,18 +50,14 @@
     (web request)
     (web server)
     (web uri)
-
     (only (sph module)
       module-ref-no-error
       call-if-defined
       path->module-name
       path->symbol-list
       find-modules)
-
     (only (sph process) shell-eval)
-    (only (sph server) server-create-bound-socket)
-
-)
+    (only (sph server) server-create-bound-socket))
 
   (define-syntax-rule (swa-path->module-name a)
     (let (path (swa-search-load-paths a))
@@ -96,12 +92,12 @@
             (variable-ref variable))))))
 
   (define (branch-route-path project-name path . arguments)
-    "select the branch-procedure to apply from the path of the url.
-    branch-name[/binding-name-part ...]
-    binding-name-parts are joined with \"-\"
-    example
-    \"content/view\" maps to the binding content-view in the module (project-name branch content).
-    the project-name argument limits the imported/extended projects to search in, which might decrease execution time"
+    "false/symbol/(symbol ...) string any ... -> any
+     select the branch procedure to apply from the path of the url.
+     branch-name[/binding-name-part ...]
+     binding-name-parts are joined with \"-\"
+     for example, the input path \"content/view\" would try to call the procedure content-view from the module (project-name branch content) with the given arguments.
+     project-name can be false, in which case the procedure is searched in all imported modules until one is found."
     (apply
       (l (branch . variable)
         (if (null? variable) (respond 404)
@@ -142,7 +138,7 @@
 
   (define (swa-sync-import-root-files swa-root . paths)
     "symlink non-generated files from the imports root-directories into the current root.
-    currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
+     currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
     (each
       (l (e)
         (shell-eval
@@ -175,7 +171,7 @@
 
   (define-syntax-rule (swa-initialise-library-prefix swa-root)
     (let*
-      ( (library-prefix (path->module-name swa-root #t))
+      ( (library-prefix (path->symbol-list swa-root))
         (library-prefix
           (if library-prefix library-prefix
             (begin (add-to-load-path (dirname swa-root)) (path->module-name swa-root)))))
@@ -186,17 +182,18 @@
           (q search-paths) %load-path (q guessed-root-directory) swa-root))))
 
   (define (swa-initialise-config config) (config-load swa-default-config)
-    (catch (if config (q none) (q configuration-file-does-not-exist)) (thunk (config-load config))
-      (l a #f)))
+    (catch (if config (q none) (q configuration-file-does-not-exist))
+      (nullary (config-load config)) (l a #f)))
 
   (define (default-server-error-handler key resume socket . a) (log-message (q error) (pair key a))
     (if (port-closed? socket) #f (resume)))
 
   (define-syntax-rule (local-socket-set-options address)
     (if (string-prefix? "/" address)
+      ; set socket permissions and group if configured in config file
       (let ((perm (config-ref socket-permissions)) (group (config-ref socket-group)))
         (if (integer? perm) (chmod address perm))
-        ;socket group setting can be tricky - under some circumstances or on some platforms it is not possible
+        ; socket group setting can be tricky: in some circumstances or on some platforms it is not possible
         (if group (chown address -1 (if (string? group) (group:gid (getgrnam group)) group))))))
 
   (define (call-with-socket listen-address listen-port proc)
@@ -208,9 +205,9 @@
       (exception-handler default-server-error-handler)
       (exception-keys #t))
     "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
-    starts a server to process scgi requests.
-    this uses (sph scgi) which uses (sph server).
-    currently the given exception handlers are only installed when the \"development\" config option is unset or false"
+     starts a server to process scgi requests.
+     this uses (sph scgi) which uses (sph server).
+     currently the given exception handlers are only installed when the \"development\" config option is unset or false"
     (swa-start
       (l (app-respond)
         (let
@@ -234,8 +231,8 @@
 
   (define* (swa-start-http #:optional (imports (list)) config)
     "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/ (symbol ...) ->
-    starts a server to process http requests.
-    this uses guiles (web server) and has been implemented more recently"
+     starts a server to process http requests. no scgi proxy needed.
+     this uses guiles (web server) and has not been tested much yet"
     (swa-start
       (l (app-respond)
         (let
@@ -263,15 +260,14 @@
 
   (define* (swa-start proc #:optional (imports (list)) config)
     "(string:guile-load-path-relative-path ...) string/rnrs-hashtable ->
-    procedure:{procedure:{headers client ->}:respond ->} procedure ->
-    initialises the application, calls proc, and deinitialises the application.
-    the paths in imports should be directing to other web-app projects relative
-    to the load-path that is used by guile. these projects being \"imported\"
-    means they will be recognised in procedures like \"branch-ref\" and \"client-template\".
-    it is no problem to use (sph lang template) source-files in the parent project, the compilation
-    results are always stored in the parents \"root/\" directory.
-    all other files from the \"root/\" of imported-projects will be symlinked into the parent \"root/\".
-    applies app-initialise without arguments if it is defined in the current-module"
+     procedure:{procedure:{headers client ->}:respond ->} procedure ->
+     initialises the application, calls proc, and afterwards deinitialises the application.
+     the paths in imports should be directing to other web-app projects, relative
+     to the load-path that is used by guile. these projects being \"imported\"
+     means they will be recognised in procedures like \"branch-ref\" and \"client-template\".
+     asset compilation results are always stored in the current project, even if the source files are from imported projects.
+     all other files from the \"root/\" of imported-projects are symlinked into the parent \"root/\".
+     calls app-initialise without arguments if it is defined"
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
     (apply swa-sync-import-root-files swa-paths) (swa-initialise-library-prefix swa-root)
