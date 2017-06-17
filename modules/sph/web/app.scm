@@ -23,7 +23,7 @@
     swa-http-response
     swa-http-response*
     swa-initialise-config
-    swa-library-prefix
+    swa-module-prefix
     swa-paths
     swa-project-name
     swa-request
@@ -41,6 +41,7 @@
     (sph conditional)
     (sph config)
     (sph log)
+    (sph module)
     (sph scgi)
     (sph web app base)
     (sph web app client)
@@ -50,12 +51,6 @@
     (web request)
     (web server)
     (web uri)
-    (only (sph module)
-      module-ref-no-error
-      call-if-defined
-      path->module-name
-      path->symbol-list
-      find-modules)
     (only (sph process) shell-eval)
     (only (sph server) server-create-bound-socket))
 
@@ -140,11 +135,11 @@
     "symlink non-generated files from the imports root-directories into the current root.
      currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
     (each
-      (l (e)
+      (l (a)
         (shell-eval
           (string-append
             "cp --recursive --no-clobber --dereference --symbolic-link --target-directory="
-            (string-append swa-root "root") " " (string-append e "root/*") " 2> /dev/null")))
+            (string-append swa-root "root") " " (string-append a "root/*") " 2> /dev/null")))
       paths))
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
@@ -155,12 +150,12 @@
     ;(current-filename) gave #f"
     (let*
       ( (swa-root (swa-module-name->root-path (module-name (current-module))))
-        (library-names (find-modules (string-append swa-root "branch/") #:max-depth 1)))
+        (library-names (module-find (string-append swa-root "branch/") #:max-depth 1)))
       (datum->syntax s (pair (q import) library-names))))
 
-  (define-syntax-rule (import-main library-prefix)
+  (define-syntax-rule (import-main module-prefix)
     ;import the main.scm module
-    (module-use! (current-module) (resolve-interface (append library-prefix (q (main))))))
+    (module-use! (current-module) (resolve-interface (append module-prefix (q (main))))))
 
   (define-syntax-rule (start-message address port)
     (display
@@ -169,23 +164,24 @@
           "")
         "\n")))
 
-  (define-syntax-rule (swa-initialise-library-prefix swa-root)
+  (define-syntax-rule (swa-initialise-module-prefix swa-root)
     (let*
-      ( (library-prefix (path->symbol-list swa-root))
-        (library-prefix
-          (if library-prefix library-prefix
-            (begin (add-to-load-path (dirname swa-root)) (path->module-name swa-root)))))
-      (if (and (list? library-prefix) (not (null? library-prefix)))
-        (begin (set! swa-library-prefix library-prefix)
-          (set! swa-project-name (symbol->string (last library-prefix))) (import-main library-prefix))
-        (throw (q project-not-in-load-path) "this is required for loading application parts"
-          (q search-paths) %load-path (q guessed-root-directory) swa-root))))
+      ( (swa-root (string-trim-right swa-root #\/)) (load-path (path->load-path swa-root))
+        (relative-path
+          (if load-path (string-drop-prefix (string-append (realpath* load-path) "/") swa-root)
+            (basename swa-root)))
+        (prefix (map string->symbol (string-split relative-path #\/))))
+      (if (not load-path) (add-to-load-path (dirname swa-root))) (set! swa-module-prefix prefix)
+      (set! swa-project-name (basename relative-path)) (import-main prefix)))
+
+  "web-projects/harkona/sph-cms"
+  "web-projects-harkona-sph-cms"
 
   (define (swa-initialise-config config) (config-load swa-default-config)
-    (catch (if config (q none) (q configuration-file-does-not-exist))
-      (nullary (config-load config)) (l a #f)))
+    (guard (obj ((if config #f (eq? (first obj) (q configuration-file-does-not-exist))) #f))
+      (config-load config)))
 
-  (define (default-server-error-handler key resume socket . a) (log-message (q error) (pair key a))
+  (define (default-server-error-handler obj resume socket) (log-message (q error) obj)
     (if (port-closed? socket) #f (resume)))
 
   (define-syntax-rule (local-socket-set-options address)
@@ -262,15 +258,16 @@
     "(string:guile-load-path-relative-path ...) string/rnrs-hashtable ->
      procedure:{procedure:{headers client ->}:respond ->} procedure ->
      initialises the application, calls proc, and afterwards deinitialises the application.
-     the paths in imports should be directing to other web-app projects, relative
+     must be called with the project directory as current working directory.
+     paths in imports should be directing to other web-app projects, relative
      to the load-path that is used by guile. these projects being \"imported\"
      means they will be recognised in procedures like \"branch-ref\" and \"client-template\".
      asset compilation results are always stored in the current project, even if the source files are from imported projects.
      all other files from the \"root/\" of imported-projects are symlinked into the parent \"root/\".
-     calls app-initialise without arguments if it is defined"
+     calls app-initialise and app-deinitialise without arguments if they are defined"
     (set! swa-root (string-append (getcwd) "/"))
     (set! swa-paths (pair swa-root (map import-path->swa-path imports)))
-    (apply swa-sync-import-root-files swa-paths) (swa-initialise-library-prefix swa-root)
+    (apply swa-sync-import-root-files swa-paths) (swa-initialise-module-prefix swa-root)
     (swa-initialise-config config)
     (let* ((m (current-module)) (app-respond (module-ref m (q app-respond))))
       (call-if-defined m (q app-initialise)) (proc app-respond)

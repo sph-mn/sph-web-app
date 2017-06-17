@@ -22,4 +22,4 @@
   (define (swa-mode-get) (if (config-ref development) (q development) (q production)))
 
   (define (swa-search-load-paths a)
-    (any (l (e) (let (path (string-append e a)) (if (file-exists? path) path #f))) swa-paths)))
+    (any (l (b) (let (path (string-append b a)) (if (file-exists? path) path #f))) swa-paths)))
