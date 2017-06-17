@@ -13,7 +13,7 @@
     config-ref
     config-set!
     headers-content-length
-    import-all-branches
+    import-branches
     log-message
     match-path
     primitive-branch-ref
@@ -63,9 +63,6 @@
 
   (define-syntax-rule (swa-module-name->path a)
     (%search-load-path (string-append (string-join (map symbol->string a) "/") ".scm")))
-
-  (define-syntax-rule (swa-module-name->root-path a)
-    (string-longest-prefix (swa-module-name->path a) swa-paths))
 
   (define (swa-path->root-path a) "string -> string/boolean" (string-longest-prefix a swa-paths))
 
@@ -144,17 +141,14 @@
 
   (define-syntax-rule (match-path path specs ...) (match (tail (path->list path)) specs ...))
 
-  (define-syntax-case (import-all-branches) s
-    ;"imports all modules in the branch/ directory. not recursively, only the modules on the first level.
-    ;a catch here is to load the branch module files relative to the currently evaluated file.
-    ;(current-filename) gave #f"
-    (let*
-      ( (swa-root (swa-module-name->root-path (module-name (current-module))))
-        (library-names (module-find (string-append swa-root "branch/") #:max-depth 1)))
-      (datum->syntax s (pair (q import) library-names))))
+  (define-syntax-case (import-branches) s
+    ; imports all modules on the first level in the branch/ directory.
+    (let (module-names (map first (module-find (string-append swa-root "branch/") #:max-depth 1)))
+      (datum->syntax s (pair (q import) module-names))))
 
   (define-syntax-rule (import-main module-prefix)
-    ;import the main.scm module
+    ; (symbol ...) ->
+    ; import the {swa-root}/main.scm module
     (module-use! (current-module) (resolve-interface (append module-prefix (q (main))))))
 
   (define-syntax-rule (start-message address port)
