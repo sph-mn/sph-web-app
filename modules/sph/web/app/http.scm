@@ -2,6 +2,9 @@
   (export
     nginx-respond-file
     nginx-respond-file-download
+    respond
+    respond-html
+    respond-type
     sph-web-app-http-description
     swa-http-create-response
     swa-http-header-content-type
@@ -13,16 +16,18 @@
     swa-http-respond
     swa-http-response
     swa-http-response*
+    swa-http-response-body
     swa-http-response-content-type-add
-    swa-http-response-header-add!
+    swa-http-response-headers
+    swa-http-response-headers-add!
+    swa-http-response-status
     swa-http-send-response
     swa-http-send-response-body)
   (import
     (sph base)
     (sph record)
-    (sph web http)
-    ;(guile)
-    )
+    (sph web app client)
+    (sph web http))
 
   (define sph-web-app-http-description "http request/response helpers")
   ;

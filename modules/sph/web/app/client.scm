@@ -9,13 +9,13 @@
     client-html-file
     client-javascript
     client-javascript-file
-    client-port)
+    client-port
+    shtml-includes-proc
+    sph-web-app-client-description)
   (import
     (ice-9 threads)
     (rnrs eval)
     (sph base)
-    (sph conditional)
-    (sph config)
     (sph filesystem asset-compiler)
     (sph lang plcss)
     (sph lang sescript)
@@ -23,15 +23,25 @@
     (sph log)
     (sph process create)
     (sph record)
-    (sph web app base)
-    (sxml simple)
-    (only (guile) current-output-port))
+    (sph web app start)
+    (sph web shtml)
+    (sxml simple))
 
-  (define sph-web-app-client-description "client-code processing")
-  ;
+  (define sph-web-app-client-description
+    "client-code processing
+     transport protocol agnostic - just writes to port or returns the path of a prepared file")
+
   ; -- path preparation
-  ;
-  (define-syntax-rule (client-output-directory) (string-append swa-root "root/"))
+
+  (define (swa-paths-search swa-paths relative-path)
+    "(string ...) string -> false/(load-path . relative-path)"
+    (any
+      (l (load-path)
+        (let (path (string-append load-path relative-path))
+          (and (file-exists? path) (pair load-path relative-path))))
+      swa-paths))
+
+  (define-syntax-rule (client-output-directory swa-root) (string-append swa-root "root/"))
   (define-syntax-rule (client-output-path) "assets/")
 
   (define-as client-format->suffixes-ht symbol-hashtable
@@ -40,12 +50,13 @@
   (define-syntax-rule (client-format->suffixes format)
     (hashtable-ref client-format->suffixes-ht format (list)))
 
-  (define (client-delete-compiled-files)
+  (define (client-delete-compiled-files swa-root)
     "deletes all filles in the client data output directory with an underscore as prefix,
      which should only be previously generated client-code files"
     (each
       (l (format)
-        (let (path (string-append (client-output-directory) (client-output-path) format "/"))
+        (let
+          (path (string-append (client-output-directory swa-root) (client-output-path) format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
@@ -54,15 +65,17 @@
   (define (path-add-prefix a format) "string symbol -> string"
     (string-append "client/" (symbol->string format) "/" a))
 
-  (define (path-relative->path-full path format)
-    (let (path (path-add-prefix path format))
-      (identity-if
-        (or (swa-search-load-paths path)
-          (any (l (suffix) (swa-search-load-paths (string-append path suffix)))
-            (client-format->suffixes format)))
-        (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
+  (define (path-relative->path-full swa-paths path format)
+    (let*
+      ( (path (path-add-prefix path format))
+        (path
+          (or (swa-paths-search swa-paths path)
+            (any (l (suffix) (swa-paths-search swa-paths (string-append path suffix)))
+              (client-format->suffixes format))
+            (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
+      (if path (string-append (first path) "/" (tail path)))))
 
-  (define (path-pair->path-full a format)
+  (define (path-pair->path-full swa-paths a format)
     "(string:path-suffix . string:path) symbol -> false/string"
     (let*
       ( (path-suffix (ensure-trailing-slash (first a)))
@@ -75,7 +88,7 @@
       (if (and path-full (file-exists? path-full)) path-full
         (begin (log-message (q error) (string-append "missing file \"" path-full "\"")) #f))))
 
-  (define (prepare-sources sources output-format enter-list?)
+  (define (prepare-sources swa-paths sources output-format enter-list?)
     "list symbol boolean -> false/list
      convert source elements of different types to strings.
      * string: relative paths to full path
@@ -86,9 +99,10 @@
       (every-map
         (l (a)
           (cond
-            ((string? a) (if (string-prefix? "/" a) a (path-relative->path-full a output-format)))
-            ((list? a) (if enter-list? (prepare-sources a output-format #f) a))
-            ((pair? a) (path-pair->path-full a output-format)) (else a)))
+            ( (string? a)
+              (if (string-prefix? "/" a) a (path-relative->path-full swa-paths a output-format)))
+            ((list? a) (if enter-list? (prepare-sources swa-paths a output-format #f) a))
+            ((pair? a) (path-pair->path-full swa-paths a output-format)) (else a)))
         sources)))
 
   ;-- file processing
@@ -178,19 +192,19 @@
       (record ac-config-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   ;-- main exports
-  ;
 
-  (define (client-port port-output output-format bindings sources)
+  (define (client-port swa-env port-output output-format bindings sources)
     "port symbol list:alist:template-variables list -> unspecified"
-    (and-let* ((sources (prepare-sources sources output-format #t)))
-      (ac-compile client-ac-config (swa-mode-get)
+    (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format #t)))
+      (ac-compile client-ac-config (hashtable-ref (swa-env-config swa-env) (q mode))
         port-output output-format sources (symbol-hashtable template-bindings bindings))))
 
-  (define (client-file output-format bindings sources)
+  (define (client-file output-format swa-env bindings sources)
     "symbol list:alist:template-variables list -> string:url-path"
     (and-let*
-      ( (output-directory (client-output-directory)) (mode (swa-mode-get))
-        (sources (prepare-sources sources output-format #t))
+      ( (output-directory (client-output-directory (swa-env-root swa-env)))
+        (mode (hashtable-ref (swa-env-config swa-env) (q mode)))
+        (sources (prepare-sources (swa-env-paths swa-env) sources output-format #t))
         (path
           (ac-compile->file client-ac-config mode
             (string-append output-directory (client-output-path)) output-format
@@ -199,18 +213,42 @@
             (symbol-hashtable template-bindings bindings))))
       (string-append "/" (string-drop-prefix output-directory path))))
 
-  (define (client-javascript port bindings . sources)
+  (define (client-javascript swa-env port bindings . sources)
     "port list:alist:template-variables string ... -> unspecified
      like client-port with output format \"javascript\""
-    (client-port port (q javascript) bindings sources))
+    (client-port swa-env port (q javascript) bindings sources))
 
-  (define (client-css port bindings . sources) (client-port port (q css) bindings sources))
-  (define (client-html port bindings . sources) (client-port port (q html) bindings sources))
+  (define (client-css swa-env port bindings . sources)
+    (client-port swa-env port (q css) bindings sources))
 
-  (define (client-javascript-file bindings . sources)
+  (define (client-html swa-env port bindings . sources)
+    (client-port swa-env port (q html) bindings sources))
+
+  (define (client-javascript-file swa-env bindings . sources)
     "list:alist:template-variables string ... -> url-path
      like client-file with output format \"javascript\""
-    (client-file (q javascript) bindings sources))
+    (client-file (q javascript) swa-env bindings sources))
 
-  (define (client-css-file bindings . sources) (client-file (q css) bindings sources))
-  (define (client-html-file bindings . sources) (client-file (q html) bindings sources)))
+  (define (client-css-file swa-env bindings . sources)
+    (client-file (q css) swa-env bindings sources))
+
+  (define (client-html-file swa-env bindings . sources)
+    (client-file (q html) swa-env bindings sources))
+
+  (define (shtml-includes-proc sources-css sources-javascript)
+    "(string ...) (string ...) -> procedure:{symbol procedure:{symbol -> (string ...)} -> list:shtml}
+     creates a procedure that returns sxml html for including either css or javascript,
+     depending on the format parameter. sources-css and sources-javascript will be passed to client-file.
+     sources-css and sources-javascript will always be included when the returned procedure is called.
+     the procedure get-sources should return additional source files or an empty list"
+    (let-syntax
+      ( (get-sxml
+          (syntax-rule (format get-sources sources client-file create-include-sxml)
+            (map create-include-sxml
+              (append (let (a (apply client-file #f sources)) (if a (any->list a) (list)))
+                (let (a (get-sources format)) (if a (any->list a) (list))))))))
+      (l (format get-sources) "symbol procedure:{symbol false -> string/(string ...)}"
+        (if (equal? (q css) format)
+          (get-sxml format get-sources sources-css client-css-file shtml-include-css)
+          (get-sxml format get-sources
+            sources-javascript client-javascript-file shtml-include-javascript))))))

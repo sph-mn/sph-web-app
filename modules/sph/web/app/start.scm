@@ -1,6 +1,10 @@
 (library (sph web app start)
   (export
     sph-web-app-start-description
+    swa-env
+    swa-env-config
+    swa-env-paths
+    swa-env-root
     swa-start)
   (import
     (sph base)
