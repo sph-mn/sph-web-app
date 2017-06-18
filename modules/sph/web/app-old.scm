@@ -66,64 +66,16 @@
 
   (define (swa-path->root-path a) "string -> string/boolean" (string-longest-prefix a swa-paths))
 
-  (define primitive-branch-ref
-    (procedure->cached-procedure
-      (l* (branch-name binding-name #:optional project-name)
-        "symbol symbol symbol/(symbol ...) -> procedure/boolean:false
-        the binding name is constructed as {branch-name}-{binding-name}.
-        if project-name is not given, the binding is searched in all swa-paths"
-        (let
-          (module-name
-            (if (symbol? project-name) (pair project-name (list (q branch) branch-name))
-              (if (list? project-name) (append project-name (list (q branch) branch-name))
-                (swa-path->module-name
-                  (string-append "branch/" (symbol->string branch-name) ".scm")))))
-          (and-let*
-            ( (module (resolve-module module-name #:ensure #f))
-              (variable (module-variable module (symbol-append branch-name (q -) binding-name))))
-            (variable-ref variable))))))
-
-  (define (branch-route-path project-name path . arguments)
-    "false/symbol/(symbol ...) string any ... -> any
-     select the branch procedure to apply from the path of the url.
-     branch-name[/binding-name-part ...]
-     binding-name-parts are joined with \"-\"
-     for example, the input path \"content/view\" would try to call the procedure content-view from the module (project-name branch content) with the given arguments.
-     project-name can be false, in which case the procedure is searched in all imported modules until one is found."
-    (apply
-      (l (branch . variable)
-        (if (null? variable) (respond 404)
-          (let
-            (proc
-              (primitive-branch-ref (string->symbol branch)
-                (string->symbol (string-join variable "-")) project-name))
-            (if proc (apply proc arguments) (respond 404)))))
-      (tail (string-split path #\/))))
-
-  (define-syntax-rule
-    (branch-ref unquoted-branch-name unquoted-binding-name unquoted-project-name ...)
-    ;get a binding from a branch at run-time. with this, branch modules do not need to depend on each other
-    ;to make internal redirects
-    (primitive-branch-ref (q unquoted-branch-name) (q unquoted-binding-name)
-      (q unquoted-project-name) ...))
-
   (define (import-path->swa-path a)
     (any
       (l (e)
         (let (full-path (string-append e "/" a "/")) (if (file-exists? full-path) full-path #f)))
       %load-path))
 
-  (define-syntax-case (import-branches) s
-    ; imports all modules on the first level in the branch/ directory.
-    (let (module-names (map first (module-find (string-append swa-root "branch/") #:max-depth 1)))
-      (datum->syntax s (pair (q import) module-names))))
-
   (define-syntax-rule (import-main module-prefix)
     ; (symbol ...) ->
     ; import the {swa-root}/main.scm module
     (module-use! (current-module) (resolve-interface (append module-prefix (q (main))))))
-
-
 
   (define-syntax-rule (swa-initialise-module-prefix swa-root)
     (let*
@@ -135,27 +87,9 @@
       (if (not load-path) (add-to-load-path (dirname swa-root))) (set! swa-module-prefix prefix)
       (set! swa-project-name (basename relative-path)) (import-main prefix)))
 
-  "web-projects/harkona/sph-cms"
-  "web-projects-harkona-sph-cms"
-
   (define (swa-initialise-config config) (config-load swa-default-config)
     (guard (obj ((if config #f (eq? (first obj) (q configuration-file-does-not-exist))) #f))
       (config-load config)))
-
-  (define (default-server-error-handler obj resume socket) (log-message (q error) obj)
-    (if (port-closed? socket) #f (resume)))
-
-  (define-syntax-rule (local-socket-set-options address)
-    (if (string-prefix? "/" address)
-      ; set socket permissions and group if configured in config file
-      (let ((perm (config-ref socket-permissions)) (group (config-ref socket-group)))
-        (if (integer? perm) (chmod address perm))
-        ; socket group setting can be tricky: in some circumstances or on some platforms it is not possible
-        (if group (chown address -1 (if (string? group) (group:gid (getgrnam group)) group))))))
-
-  (define (call-with-socket listen-address listen-port proc)
-    (let (socket (server-create-bound-socket listen-address listen-port))
-      (local-socket-set-options listen-address) (proc socket)))
 
   (define*
     (swa-start-scgi #:optional (imports (list)) config #:key (http-respond swa-http-respond)
@@ -186,35 +120,6 @@
               (display "stopped listening. ")))))
       imports config))
 
-  (define* (swa-start-http #:optional (imports (list)) config)
-    "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/ (symbol ...) ->
-     starts a server to process http requests. no scgi proxy needed.
-     this uses guiles (web server) and has not been tested much yet"
-    (swa-start
-      (l (app-respond)
-        (let
-          ( (listen-address (or (config-ref listen-address) "::1"))
-            (listen-port (or (config-ref listen-port) 8080)))
-          (call-with-socket listen-address listen-port
-            (l (socket) (start-message listen-address listen-port)
-              (run-server
-                (l (request request-body)
-                  (let*
-                    ( (headers
-                        (pair (pair "request_uri" (uri->string (request-uri request)))
-                          (map (l (e) (pair (symbol->string (first e)) (tail e)))
-                            (request-headers request))))
-                      (response (app-respond (alist-ref headers "request_uri") headers #f)))
-                    (values
-                      (read-headers
-                        (open-input-string
-                          (string-append (apply string-append (swa-http-response-header response))
-                            "\r\n")))
-                      (swa-http-response-body response))))
-                (q http) (list #:socket socket)))))
-        (display "stopped listening. "))
-      imports config))
-
   (define (swa-link-root-files swa-root . paths)
     "symlink non-generated files from the imports root-directories into the current root.
      currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
@@ -226,8 +131,7 @@
             (string-append swa-root "root") " " (string-append a "root/*") " 2> /dev/null")))
       paths))
 
-  (define-syntax-rule (swa-config-get swa-root name)
-    "string string -> list"
+  (define-syntax-rule (swa-config-get swa-root name) "string string -> list"
     (let
       ( (path (string-append swa-root "/config/" name ".scm"))
         (tree-map-lists-and-self (compose alist->hashtable list->alist)
@@ -247,13 +151,10 @@
             %load-path)))
       projects))
 
-  (define-syntax-rule (swa-import-main name)
-    (qq (import ((unquote-splicing name) main))))
+  (define-syntax-rule (swa-import-main name) (qq (import ((unquote-splicing name) main))))
 
-  (define-syntax-case (swa-init projects config-name)
-    (swa-import-main (first projects))
-    (define swa-paths (swa-paths-get projects))
-    (define swa-root (first swa-paths))
+  (define-syntax-case (swa-init projects config-name) (swa-import-main (first projects))
+    (define swa-paths (swa-paths-get projects)) (define swa-root (first swa-paths))
     (define swa-config (swa-config-get (first swa-imports) config-name))
     (apply swa-link-root-files swa-paths)
     ;(app-init)

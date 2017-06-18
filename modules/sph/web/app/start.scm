@@ -1,12 +1,24 @@
 (library (sph web app start)
   (export
+    sph-web-app-start-description
     swa-start)
   (import
     (sph base)
     (sph record)
     (only (sph tree) tree-map-lists-and-self))
 
-  (define sph-web-app-start "web app initialisation")
+  (define sph-web-app-start-description
+    "core web app initialisation
+     before using swa-start, import (sph web app) and the main module of the current project, for example with (import (sph web app) (myproject main))
+     syntax of swa-start:
+     (swa-start project-name/project-names configuration-name handler handler-arguments ...)
+     (swa-start (symbol ...)/((symbol ...) ...) string procedure:{vector:swa-env any ... -> any} any ...)
+     usage of swa-start:
+     (swa-start (myproject) \"default\" swa-scgi)
+     or
+     (swa-start ((myproject) (mymodules animportedproject)) \"development\" swa-scgi)
+     or
+     (swa-start ((a) (b) (c d)) \"development\" swa-scgi)")
 
   (define (swa-link-root-files swa-root . paths)
     "symlink non-generated files from the imports root-directories into the current root.
@@ -46,11 +58,10 @@
         (list (q project-not-in-load-path) "this is required for loading application parts"
           (q search-paths) %load-path (q projects) projects-datum))))
 
-  (define-syntax-rule (swa-import-main name) (qq (import ((unquote-splicing name) main))))
-  ;(define-record swa-request path query headers client swa-root swa-paths swa-config)
   (define-record swa-env root paths config)
 
   (define-syntax-cases swa-start s
+    ; get full paths for project names using the load path, create the swa-env and call handler.
     ( ( ( (projects ...) ...) config-name handler handler-arguments ...)
       (let*
         ( (projects-datum (syntax->datum (syntax ((projects ...) ...))))
@@ -58,14 +69,14 @@
           (paths (datum->syntax s (pair (q list) paths-datum)))
           (root (datum->syntax s (first paths-datum))))
         (swa-require-load-path paths-datum projects-datum)
+        ; unfortunately, importing the main module and calling app-init/app-deinit did not
+        ; work as it does not seem reasonably possible to make the bindings available here. even when
+        ; generating the import statement or using eval.
         (quasisyntax
           (let ((swa-paths (unsyntax paths))) (apply swa-link-root-files swa-paths)
-            ;(app-init)
             (handler
               (record swa-env (unsyntax root)
                 swa-paths (swa-config-get (unsyntax root) config-name))
-              handler-arguments ...)
-            ;(app-deinit)
-            ))))
+              handler-arguments ...)))))
     ( (projects config-name handler handler-arguments ...)
       (syntax (swa-start (projects) config-name handler handler-arguments ...)))))
