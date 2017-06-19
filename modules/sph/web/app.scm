@@ -90,10 +90,10 @@
               (if (or single-threaded (eq? mode (q development)))
                 ;single-threaded without extra exception handler
                 (scgi-handle-requests
-                  (l (headers client) (http-respond headers client app-respond)) socket 1)
+                  (l (headers client) (http-respond swa-env app-respond headers client)) socket 1)
                 ;possibly multi-threaded and all exceptions catched for continuous processing
                 (scgi-handle-requests
-                  (l (headers client) (http-respond headers client app-respond)) socket
+                  (l (headers client) (http-respond swa-env app-respond headers client)) socket
                   worker-count #f #f exception-handler exception-keys))
               (app-deinit swa-env) (display "stopped listening.")))))))
 
@@ -115,7 +115,10 @@
                         (pair (pair "request_uri" (uri->string (request-uri request)))
                           (map (l (a) (pair (symbol->string (first a)) (tail a)))
                             (request-headers request))))
-                      (response (app-respond swa-env (alist-ref headers "request_uri") headers #f)))
+                      (response
+                        (app-respond
+                          (record swa-http-request (alist-ref headers "request_uri")
+                            #f headers #f swa-env))))
                     (values
                       (read-headers
                         (open-input-string

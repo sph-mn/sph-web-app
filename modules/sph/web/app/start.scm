@@ -80,8 +80,8 @@
           (root (datum->syntax s (first paths-datum))))
         (swa-require-load-path paths-datum projects-datum)
         ; unfortunately, importing the main module and calling app-init/app-deinit did not
-        ; work as it does not seem reasonably possible to make the bindings available here. even when
-        ; generating the import statement or using eval.
+        ; work as it does not seem reasonably possible to make the bindings available here
+        ; without run-time module loading.
         (quasisyntax
           (let ((swa-paths (unsyntax paths))) (apply swa-link-root-files swa-paths)
             (handler

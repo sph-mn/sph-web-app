@@ -134,10 +134,15 @@
     (each (l (line) (display line client)) (swa-http-response-headers response))
     (swa-http-send-response-body (swa-http-response-body response) client))
 
-  (define (swa-http-respond headers client app-respond)
+  (define-record swa-http-request path query headers client swa-env)
+
+  (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
      receives a request and applies app-respond with request data to create a response"
-    (swa-http-send-response (app-respond (alist-ref headers "request_uri") headers client) client))
+    (swa-http-send-response
+      (app-respond
+        (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env))
+      client))
 
   (define-syntax-rule (respond a ...) (swa-http-response a ...))
 
