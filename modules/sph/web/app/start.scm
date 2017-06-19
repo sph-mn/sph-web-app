@@ -1,6 +1,7 @@
 (library (sph web app start)
   (export
     sph-web-app-start-description
+    swa-create
     swa-env
     swa-env-config
     swa-env-paths
@@ -10,6 +11,11 @@
     (sph base)
     (sph record)
     (only (sph tree) tree-map-lists-and-self))
+
+  (define* (swa-create respond #:optional init deinit)
+    "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
+     create a swa-app object that encapsulates the applications respond creation, initialise and deinitialise procedure"
+    (list respond (or init identity) (or deinit identity)))
 
   (define sph-web-app-start-description
     "core web app initialisation
@@ -62,7 +68,7 @@
         (list (q project-not-in-load-path) "this is required for loading application parts"
           (q search-paths) %load-path (q projects) projects-datum))))
 
-  (define-record swa-env root paths config)
+  (define-record swa-env root paths config data)
 
   (define-syntax-cases swa-start s
     ; get full paths for project names using the load path, create the swa-env and call handler.
