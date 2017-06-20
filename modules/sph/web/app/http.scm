@@ -20,6 +20,7 @@
     swa-http-request-query-parse
     swa-http-request-swa-env
     swa-http-respond
+    swa-http-respond-query
     swa-http-response
     swa-http-response*
     swa-http-response-body

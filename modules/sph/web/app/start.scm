@@ -2,9 +2,11 @@
   (export
     sph-web-app-start-description
     swa-create
-    swa-env
     swa-env-config
+    swa-env-data
+    swa-env-data-set!
     swa-env-paths
+    swa-env-record
     swa-env-root
     swa-start)
   (import
@@ -69,6 +71,7 @@
           (q search-paths) %load-path (q projects) projects-datum))))
 
   (define-record swa-env root paths config data)
+  (define swa-env-record swa-env)
 
   (define-syntax-cases swa-start s
     ; -> handler-result

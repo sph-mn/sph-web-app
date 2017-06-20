@@ -7,15 +7,19 @@
     swa-config-bind
     swa-config-ref
     swa-create
-    swa-env
     swa-env-config
+    swa-env-data
+    swa-env-data-set!
     swa-env-paths
+    swa-env-record
     swa-env-root
+    swa-env?
     swa-server-http
     swa-server-internal
     swa-server-scgi
     swa-start)
   (import
+    (ice-9 match)
     (sph base)
     (sph log)
     (sph record)
@@ -71,12 +75,22 @@
   (define (default-server-error-handler obj resume socket) (log-message (q error) obj)
     (if (port-closed? socket) #f (resume)))
 
+  (define (swa-env? a) (and (vector? a) (= (vector-length a) (hashtable-size swa-env-record))))
+
+  (define-syntax-rule (call-app-init app-init swa-env)
+    ; update only if result is a vector of specific length.
+    ; this is to make it less likely that swa-env is updated unintentionally
+    (let (a (debug-log (app-init swa-env)))
+      (if (swa-env? a) a swa-env)))
+
   (define*
-    (swa-server-scgi swa-env swa-app #:optional (http-respond swa-http-respond) #:key
+    (swa-server-scgi swa-env swa-app #:optional (http-respond swa-http-respond-query) #:key
       (exception-handler default-server-error-handler)
       (exception-keys #t))
     "vector procedure:{headers client app-respond} false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
      starts a server listens for scgi requests and calls app-respond for each new request.
+     calls app-init once on startup and app-deinit when the server stops listening.
+     app-init can return a new or updated swa-env.
      the no exception handler is installed when \"mode\" is development or \"single-threaded\" is true.
      this uses (sph scgi) which uses (sph server)"
     (swa-config-bind swa-env
@@ -90,17 +104,18 @@
         (call-with-socket listen-address listen-port
           socket-permissions socket-group
           (list-bind swa-app (app-respond app-init app-deinit)
-            (l (socket) (app-init swa-env)
-              (start-message listen-address listen-port)
-              (if (or single-threaded (eq? mode (q development)))
-                ;single-threaded without extra exception handler
-                (scgi-handle-requests
-                  (l (headers client) (http-respond swa-env app-respond headers client)) socket 1)
-                ;possibly multi-threaded and all exceptions catched for continuous processing
-                (scgi-handle-requests
-                  (l (headers client) (http-respond swa-env app-respond headers client)) socket
-                  worker-count #f #f exception-handler exception-keys))
-              (app-deinit swa-env) (display "stopped listening.")))))))
+            (l (socket)
+              (let (swa-env (call-app-init app-init swa-env))
+                (start-message listen-address listen-port)
+                (if (or single-threaded (eq? mode (q development)))
+                  ;single-threaded without extra exception handler
+                  (scgi-handle-requests
+                    (l (headers client) (http-respond swa-env app-respond headers client)) socket 1)
+                  ;possibly multi-threaded and all exceptions catched for continuous processing
+                  (scgi-handle-requests
+                    (l (headers client) (http-respond swa-env app-respond headers client)) socket
+                    worker-count #f #f exception-handler exception-keys))
+                (app-deinit swa-env) (display "stopped listening."))))))))
 
   (define (swa-server-http swa-env swa-app)
     "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/ (symbol ...) ->
@@ -111,27 +126,28 @@
         (call-with-socket listen-address listen-port
           socket-permissions socket-group
           (list-bind swa-app (app-respond app-init app-deinit)
-            (l (socket) (app-init swa-env)
-              (start-message listen-address listen-port)
-              (run-server
-                (l (request request-body)
-                  (let*
-                    ( (headers
-                        (pair (pair "request_uri" (uri->string (request-uri request)))
-                          (map (l (a) (pair (symbol->string (first a)) (tail a)))
-                            (request-headers request))))
-                      (response
-                        (app-respond
-                          (record swa-http-request (alist-ref headers "request_uri")
-                            #f headers #f swa-env))))
-                    (values
-                      (read-headers
-                        (open-input-string
-                          (string-append (apply string-append (swa-http-response-headers response))
-                            "\r\n")))
-                      (swa-http-response-body response))))
-                (q http) (list #:socket socket))
-              (app-deinit swa-env)))))))
+            (l (socket)
+              (let (swa-env (call-app-init app-init swa-env))
+                (start-message listen-address listen-port)
+                (run-server
+                  (l (request request-body)
+                    (let*
+                      ( (headers
+                          (pair (pair "request_uri" (uri->string (request-uri request)))
+                            (map (l (a) (pair (symbol->string (first a)) (tail a)))
+                              (request-headers request))))
+                        (response
+                          (app-respond
+                            (record swa-http-request (alist-ref headers "request_uri")
+                              #f headers #f swa-env))))
+                      (values
+                        (read-headers
+                          (open-input-string
+                            (string-append
+                              (apply string-append (swa-http-response-headers response)) "\r\n")))
+                        (swa-http-response-body response))))
+                  (q http) (list #:socket socket))
+                (display "stopped listening.") (app-deinit swa-env))))))))
 
   (define (swa-server-internal swa-env swa-app proc)
     "vector list procedure:{procedure:{any ... -> any}} -> any:procedure-result
