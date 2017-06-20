@@ -18,6 +18,7 @@
   (import
     (sph base)
     (sph log)
+    (sph record)
     (sph scgi)
     (sph server)
     (sph web app http)
@@ -30,6 +31,10 @@
 
   (define sph-web-app-description
     "main module that exports swa-start, swa-server-scgi and various helpers")
+
+  (define-syntax-rule (match-path path specs ...)
+    ; split a path into parts and use ice-9 match to match parts
+    (match (tail (path->list path)) specs ...))
 
   (define-syntax-rule (swa-config-ref swa-env key)
     ; get the value for an unquoted config key from a swa-env object.
@@ -67,13 +72,13 @@
     (if (port-closed? socket) #f (resume)))
 
   (define*
-    (swa-server-scgi swa-env swa-app #:key (http-respond swa-http-respond)
+    (swa-server-scgi swa-env swa-app #:optional (http-respond swa-http-respond) #:key
       (exception-handler default-server-error-handler)
       (exception-keys #t))
     "vector procedure:{headers client app-respond} false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
      starts a server listens for scgi requests and calls app-respond for each new request.
-     currently the given exception handlers are only installed when the \"development\" config option is unset or false.
-     swa-scgi uses (sph scgi) which uses (sph server)"
+     the no exception handler is installed when \"mode\" is development or \"single-threaded\" is true.
+     this uses (sph scgi) which uses (sph server)"
     (swa-config-bind swa-env
       (listen-address socket-name listen-port
         socket-permissions socket-group mode single-threaded worker-count)
@@ -134,11 +139,5 @@
      is a procedure that takes an arbitrary number of arguments and will always
      implicitly pass swa-env as the first argument to app-respond.
      afterwards deinitialise and return the result of the call to proc"
-    (list-bind swa-app (init respond deinit)
-      (init swa-env) (begin-first (proc (l a (apply respond swa-env a))) (deinit swa-env))))
-
-  ;-- other
-
-  (define-syntax-rule (match-path path specs ...)
-    ; split a path into parts and use ice-9 match to match parts
-    (match (tail (path->list path)) specs ...)))
+    (list-bind swa-app (respond init deinit)
+      (init swa-env) (begin-first (proc (l a (apply respond swa-env a))) (deinit swa-env)))))

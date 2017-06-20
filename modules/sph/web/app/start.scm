@@ -71,6 +71,7 @@
   (define-record swa-env root paths config data)
 
   (define-syntax-cases swa-start s
+    ; -> handler-result
     ; get full paths for project names using the load path, create the swa-env and call handler.
     ( ( ( (projects ...) ...) config-name handler handler-arguments ...)
       (let*

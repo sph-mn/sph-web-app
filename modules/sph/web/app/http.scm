@@ -8,11 +8,17 @@
     sph-web-app-http-description
     swa-http-create-response
     swa-http-header-content-type
+    swa-http-request
+    swa-http-request-client
     swa-http-request-cookie
+    swa-http-request-headers
     swa-http-request-https?
     swa-http-request-if-modified-since
     swa-http-request-method
+    swa-http-request-path
+    swa-http-request-query
     swa-http-request-query-parse
+    swa-http-request-swa-env
     swa-http-respond
     swa-http-response
     swa-http-response*
@@ -29,7 +35,23 @@
     (sph web app client)
     (sph web http))
 
-  (define sph-web-app-http-description "http request/response helpers")
+  (define sph-web-app-http-description
+    "http request/response helpers.
+     exports a binding named \"respond\", should that conflict with other names use the renaming
+     feature when importing rnrs libraries to add a prefix.
+     # syntax
+     respond
+       short for swa-http-create-response
+     respond-type
+       signatures
+         :: symbol:type-key procedure -> swa-http-response
+         :: symbol:type-key integer:http-status-code (string ...):headers procedure -> swa-http-response
+       description
+         respond with a type available in swa-http-key->mime-type. json, html, text, style and script are available by default.
+       examples
+         (respond-type (q text) responder)
+         (respond-type (q text) 200 headers responder)")
+
   ;
   ;-- request
   ;
@@ -62,13 +84,11 @@
       (and-let* ((a (alist-ref (swa-http-request-headers request) "if_modified_since")))
         (http-parse-date->time a))))
 
-  (define (swa-http-request-query-parse request c)
-    "vector:swa-http-request procedure:{string:path list:parsed-url-query-string -> any} -> any
-     like swa-http-respond but calls app-respond with an additional argument for the parsed url query-string.
-     key/value pairs in the query string should be separated by ; (as recommended in favor of & by the w3c).
-     note that this procedure is not required for using query-strings and that it is possible to manually parse the query string from the request-url when needed
-     (for example with swa-http-split-query-string)"
-    (let (url-path (alist-ref (swa-http-request-headers request) "request_uri"))
+  (define (swa-http-parse-query headers c)
+    "list procedure:{string:path ((key . value) ...):parsed-query-string -> any} -> any
+     key/value pairs in the query string must be separated by ; (as recommended by the w3c instead of &).
+     the header that contains the full url path must be available and have the lowercase name \"request_uri\""
+    (let (url-path (alist-ref headers "request_uri"))
       (apply
         (l (path . arguments)
           (c path
@@ -138,13 +158,22 @@
 
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
-     receives a request and applies app-respond with request data to create a response"
+     receives a request and applies app-respond with a request object and sends the response"
     (swa-http-send-response
       (app-respond
         (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env))
       client))
 
-  (define-syntax-rule (respond a ...) (swa-http-response a ...))
+  (define (swa-http-respond-query swa-env app-respond headers client)
+    "vector procedure list port -> vector
+     like swa-http-respond but parses an available url query string into an association list that is passed in the request object"
+    (swa-http-send-response
+      (swa-http-parse-query headers
+        (l (path arguments)
+          (app-respond (record swa-http-request path arguments headers client swa-env))))
+      client))
+
+  (define-syntax-rule (respond a ...) (swa-http-create-response a ...))
 
   (define-syntax-rules respond-type
     ((type-key body) (respond 200 (list (swa-http-header-content-type type-key)) body))
@@ -152,19 +181,26 @@
       (respond status (pair (swa-http-header-content-type type-key) header-lines) body)))
 
   (define* (respond-html bindings source #:optional (headers (list)))
+    "list list:client-html-source [list] -> vector:swa-http-response
+     respond with status code 200 and content type text/html"
     (respond 200 (pair "content-type:text/html\r\n" headers)
       (l (client) (client-html client bindings source))))
 
   (define* (nginx-respond-file path #:optional mime-type)
-    "the path is always relative to a configured nginx location or root"
+    "string [string] -> swa-http-response
+     adds an x-accel-redirect header, which is nginx' feature to advise it to send
+     a file which should be faster and easier to do that managing the file sending in user code.
+     respond with status code 200 and no additional (nginx will normally choose one) or the given mime-type.
+     the path is always relative to a configured nginx location or root"
     (respond 200
       (append (list (http-header-line "x-accel-redirect" path))
         (if mime-type (list (http-header-line "content-type" mime-type)) (list)))
       ""))
 
   (define* (nginx-respond-file-download path file-name #:optional mime-type)
-    "like nginx-respond-file but adds a content-disposition header to suggest to the client
-     that it should be treated as a download even if the client can display it"
+    "string string [string] -> swa-http-response
+     like nginx-respond-file but also adds a content-disposition header to suggest to the client
+     that the file should be downloaded instead of displayed where possible"
     (respond 200
       (append
         (list (http-header-line "x-accel-redirect" path)
