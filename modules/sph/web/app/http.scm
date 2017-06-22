@@ -126,7 +126,7 @@
      key has to exist in swa-http-key->mime-type. by default json, html, text, style and script are available."
     (swa-http-response-headers-add! a (swa-http-header-content-type key)))
 
-  (define (swa-http-response* a)
+  (define (swa-http-create-response* a)
     "integer/vector/procedure:{port ->}/string/any -> vector:swa-http-response
      integer: http status code only, empty response-body
      vector: as is. likely a swa-http-response-record

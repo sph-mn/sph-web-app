@@ -80,13 +80,11 @@
   (define-syntax-rule (call-app-init app-init swa-env)
     ; update only if result is a vector of specific length.
     ; this is to make it less likely that swa-env is updated unintentionally
-    (let (a (debug-log (app-init swa-env)))
-      (if (swa-env? a) a swa-env)))
+    (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
 
   (define*
     (swa-server-scgi swa-env swa-app #:optional (http-respond swa-http-respond-query) #:key
-      (exception-handler default-server-error-handler)
-      (exception-keys #t))
+      (exception-handler default-server-error-handler))
     "vector procedure:{headers client app-respond} false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
      starts a server listens for scgi requests and calls app-respond for each new request.
      calls app-init once on startup and app-deinit when the server stops listening.
@@ -95,26 +93,28 @@
      this uses (sph scgi) which uses (sph server)"
     (swa-config-bind swa-env
       (listen-address socket-name listen-port
-        socket-permissions socket-group mode single-threaded worker-count)
+        socket-permissions socket-group mode single-threaded thread-count)
       (let
         ( (listen-address
             (or listen-address
               (if socket-name (string-append (dirname scgi-default-address) "/" socket-name)
-                scgi-default-address))))
+                scgi-default-address)))
+          (development (eq? mode (q development))))
         (call-with-socket listen-address listen-port
           socket-permissions socket-group
           (list-bind swa-app (app-respond app-init app-deinit)
             (l (socket)
               (let (swa-env (call-app-init app-init swa-env))
                 (start-message listen-address listen-port)
-                (if (or single-threaded (eq? mode (q development)))
+                (if (or single-threaded development)
                   ;single-threaded without extra exception handler
                   (scgi-handle-requests
-                    (l (headers client) (http-respond swa-env app-respond headers client)) socket 1)
+                    (l (headers client) (http-respond swa-env app-respond headers client)) socket
+                    1 #f #f (if development #f exception-handler))
                   ;possibly multi-threaded and all exceptions catched for continuous processing
                   (scgi-handle-requests
                     (l (headers client) (http-respond swa-env app-respond headers client)) socket
-                    worker-count #f #f exception-handler exception-keys))
+                    thread-count #f #f exception-handler))
                 (app-deinit swa-env) (display "stopped listening."))))))))
 
   (define (swa-server-http swa-env swa-app)
