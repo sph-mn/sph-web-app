@@ -168,28 +168,36 @@
     (list-bind swa-app (respond init deinit)
       (init swa-env) (begin-first (proc swa-env respond) (deinit swa-env))))
 
+  (define (with-response-and-string get-response client path/headers c)
+    (let*
+      ( (headers (if (string? path/headers) (list (pair "request_uri" path/headers)) path/headers))
+        (response (get-response headers))
+        (response-string
+          (begin (swa-http-response-send response client) (get-output-string client))))
+      (c response response-string)))
+
   (define (swa-test-http-procedure-wrap swa-env app-respond)
     "to be used for the procedure-wrap option in (sph test) settings.
      extends a (sph test) test procedure to call app-respond with a swa-http-request object like swa-server-scgi would.
      test procedures are expected to not be defined with define-test, but instead with the signature:
-       test-mytest :: get-response client a ... -> test-result
-       test-mytest :: get-response client arguments expected test-settings -> test-result
-     it will otherwise behave as if defined as (define-test (mytest)).
-     the first argument to the test procedure is a procedure that takes a list of request headers and returns
-     the result of calling app-respond.
-     the second argument to the test procedure is an output-string-port that was passed as the client port to app-respond.
-     the http response string can be read in the test procedure from the response with:
-       (swa-http-response-send response client)
-       (get-output-string client))"
+       test-mytest :: get-response a ... -> test-result
+       test-mytest :: get-response arguments expected test-settings -> test-result
+       get-response :: string:path/((string . string) ...):headers procedure:{swa-http-response response-string -> any} -> any
+     it will otherwise behave as if defined like (define-test (mytest _ ...) _ ...).
+     the first argument to the test procedure is a procedure that either takes a path or an association list of request headers,
+     and a procedure that will be called with the response object and the full http response string that app-respond created"
     (l (test-proc)
       (l (arguments . a)
         (let (client (open-output-string))
           (apply test-proc
-            (l (headers) "list -> swa-http-response"
-              (swa-http-parse-query headers
-                (l (path arguments)
-                  (app-respond (record swa-http-request path arguments headers client swa-env)))))
-            client a)))))
+            (l (path/headers c)
+              (with-response-and-string
+                (l (headers) "list -> swa-http-response"
+                  (swa-http-parse-query headers
+                    (l (path arguments)
+                      (app-respond (record swa-http-request path arguments headers client swa-env)))))
+                client path/headers c))
+            a)))))
 
   (define-syntax-rule (swa-test-http-start projects config-name swa-app test-settings c)
     (swa-start projects config-name
