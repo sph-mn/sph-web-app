@@ -8,6 +8,7 @@
     sph-web-app-http-description
     swa-http-create-response
     swa-http-header-content-type
+    swa-http-parse-query
     swa-http-request
     swa-http-request-client
     swa-http-request-cookie
@@ -27,9 +28,9 @@
     swa-http-response-content-type-add
     swa-http-response-headers
     swa-http-response-headers-add!
-    swa-http-response-status
-    swa-http-send-response
-    swa-http-send-response-body)
+    swa-http-response-send
+    swa-http-response-send-body
+    swa-http-response-status)
   (import
     (sph base)
     (sph record)
@@ -140,27 +141,27 @@
           (if (vector? a) a (swa-http-create-response 200 (list) (if (string? a) a "")))))
       (swa-http-create-response 404 (list) "")))
 
-  (define (swa-http-send-response-body a client)
+  (define (swa-http-response-send-body a client)
     (if (procedure? a) (begin (display "\n" client) (a client))
       (if (string? a)
         (begin (display (http-header-line "content-length" (string-octet-length a)) client)
           (display "\n" client) (display a client)))))
 
-  (define (swa-http-send-response response client)
+  (define (swa-http-response-send response client)
     "vector:swa-http-response port ->
      sends a response with http syntax.
      swa-http-response-body can be a procedure, which will be applied with the client-port.
      this enables stream-like response-body sending"
     (http-write-status-line (swa-http-response-status response) client)
     (each (l (line) (display line client)) (swa-http-response-headers response))
-    (swa-http-send-response-body (swa-http-response-body response) client))
+    (swa-http-response-send-body (swa-http-response-body response) client))
 
   (define-record swa-http-request path query headers client swa-env)
 
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
      receives a request and applies app-respond with a request object and sends the response"
-    (swa-http-send-response
+    (swa-http-response-send
       (app-respond
         (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env))
       client))
@@ -168,7 +169,7 @@
   (define (swa-http-respond-query swa-env app-respond headers client)
     "vector procedure list port -> vector
      like swa-http-respond but parses an available url query string into an association list that is passed in the request object"
-    (swa-http-send-response
+    (swa-http-response-send
       (swa-http-parse-query headers
         (l (path arguments)
           (app-respond (record swa-http-request path arguments headers client swa-env))))

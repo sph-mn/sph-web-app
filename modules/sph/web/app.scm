@@ -17,7 +17,9 @@
     swa-server-http
     swa-server-internal
     swa-server-scgi
-    swa-start)
+    swa-start
+    swa-test-http-procedure-wrap
+    swa-test-http-start)
   (import
     (ice-9 match)
     (sph base)
@@ -34,7 +36,14 @@
     (only (guile) port-closed?))
 
   (define sph-web-app-description
-    "main module that exports swa-start, swa-server-scgi and various helpers")
+    "main module that exports swa-start, swa-server-scgi and various helpers.
+     # syntax
+     swa-test-http-start :: projects config-name swa-app test-settings proc -> test-result
+       start a sph web app application for use in a (sph test) module.
+       sets the procedure-wrap test setting.
+       example usage:
+         (swa-test-http-start (sph-cms) \"default\"
+         swa-app test-settings (l (test-settings swa-env) (test-execute-procedures test-settings tests)))")
 
   (define-syntax-rule (match-path path specs ...)
     ; split a path into parts and use ice-9 match to match parts
@@ -83,7 +92,7 @@
     (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
 
   (define*
-    (swa-server-scgi swa-env swa-app #:optional (http-respond swa-http-respond-query) #:key
+    (swa-server-scgi swa-env swa-app #:key (parse-query? #t)
       (exception-handler default-server-error-handler))
     "vector procedure:{headers client app-respond} false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
      starts a server listens for scgi requests and calls app-respond for each new request.
@@ -99,7 +108,8 @@
             (or listen-address
               (if socket-name (string-append (dirname scgi-default-address) "/" socket-name)
                 scgi-default-address)))
-          (development (eq? mode (q development))))
+          (development (eq? mode (q development)))
+          (http-respond (if parse-query? swa-http-respond-query swa-http-respond)))
         (call-with-socket listen-address listen-port
           socket-permissions socket-group
           (list-bind swa-app (app-respond app-init app-deinit)
@@ -156,4 +166,39 @@
      implicitly pass swa-env as the first argument to app-respond.
      afterwards deinitialise and return the result of the call to proc"
     (list-bind swa-app (respond init deinit)
-      (init swa-env) (begin-first (proc (l a (apply respond swa-env a))) (deinit swa-env)))))
+      (init swa-env) (begin-first (proc swa-env respond) (deinit swa-env))))
+
+  (define (swa-test-http-procedure-wrap swa-env app-respond)
+    "to be used for the procedure-wrap option in (sph test) settings.
+     extends a (sph test) test procedure to call app-respond with a swa-http-request object like swa-server-scgi would.
+     test procedures are expected to not be defined with define-test, but instead with the signature:
+       test-mytest :: get-response client a ... -> test-result
+       test-mytest :: get-response client arguments expected test-settings -> test-result
+     it will otherwise behave as if defined as (define-test (mytest)).
+     the first argument to the test procedure is a procedure that takes a list of request headers and returns
+     the result of calling app-respond.
+     the second argument to the test procedure is an output-string-port that was passed as the client port to app-respond.
+     the http response string can be read in the test procedure from the response with:
+       (swa-http-response-send response client)
+       (get-output-string client))"
+    (l (test-proc)
+      (l (arguments . a)
+        (let (client (open-output-string))
+          (apply test-proc
+            (l (headers) "list -> swa-http-response"
+              (swa-http-parse-query headers
+                (l (path arguments)
+                  (app-respond (record swa-http-request path arguments headers client swa-env)))))
+            client a)))))
+
+  (define-syntax-rule (swa-test-http-start projects config-name swa-app test-settings c)
+    (swa-start projects config-name
+      swa-server-internal swa-app
+      (l (swa-env app-respond)
+        (let
+          ( (procedure-wrap (alist-ref test-settings (q procedure-wrap)))
+            (swa-procedure-wrap (swa-test-http-procedure-wrap swa-env app-respond)))
+          (c
+            (alist-set test-settings (q procedure-wrap)
+              (if procedure-wrap (swa-procedure-wrap procedure-wrap) swa-procedure-wrap))
+            swa-env))))))
