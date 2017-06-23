@@ -196,7 +196,7 @@
   (define (client-port swa-env port-output output-format bindings sources)
     "port symbol list:alist:template-variables list -> unspecified"
     (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format #t)))
-      (ac-compile client-ac-config (hashtable-ref (swa-env-config swa-env) (q mode))
+      (ac-compile client-ac-config (hashtable-ref (swa-env-config swa-env) (q mode) (q production))
         port-output output-format sources (symbol-hashtable template-bindings bindings))))
 
   (define (client-file output-format swa-env bindings sources)
@@ -235,20 +235,21 @@
   (define (client-html-file swa-env bindings . sources)
     (client-file (q html) swa-env bindings sources))
 
-  (define (shtml-includes-proc sources-css sources-javascript)
+  (define (shtml-includes-proc default-sources-css default-sources-javascript)
     "(string ...) (string ...) -> procedure:{symbol procedure:{symbol -> (string ...)} -> list:shtml}
      creates a procedure that returns sxml html for including either css or javascript,
-     depending on the format parameter. sources-css and sources-javascript will be passed to client-file.
-     sources-css and sources-javascript will always be included when the returned procedure is called.
-     the procedure get-sources should return additional source files or an empty list"
+     depending on the format parameter. default-sources-css and default-sources-javascript will be passed to client-file.
+     default-sources-css and default-sources-javascript will always be included when the returned procedure is called.
+     sources contains additional public relative source file paths or an empty list"
     (let-syntax
       ( (get-sxml
-          (syntax-rule (format get-sources sources client-file create-include-sxml)
+          (syntax-rule (swa-env format sources default-sources client-file create-include-sxml)
             (map create-include-sxml
-              (append (let (a (apply client-file #f sources)) (if a (any->list a) (list)))
-                (let (a (get-sources format)) (if a (any->list a) (list))))))))
-      (l (format get-sources) "symbol procedure:{symbol false -> string/(string ...)}"
+              (append
+                (let (a (apply client-file swa-env #f default-sources)) (if a (any->list a) (list)))
+                (if sources (any->list sources) (list)))))))
+      (l (swa-env format sources) "vector symbol (string ...) -> list:sxml"
         (if (equal? (q css) format)
-          (get-sxml format get-sources sources-css client-css-file shtml-include-css)
-          (get-sxml format get-sources
-            sources-javascript client-javascript-file shtml-include-javascript))))))
+          (get-sxml swa-env format sources default-sources-css client-css-file shtml-include-css)
+          (get-sxml swa-env format
+            sources default-sources-javascript client-javascript-file shtml-include-javascript))))))

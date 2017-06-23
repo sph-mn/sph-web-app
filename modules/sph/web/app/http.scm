@@ -182,11 +182,11 @@
     ( (type-key status header-lines body)
       (respond status (pair (swa-http-header-content-type type-key) header-lines) body)))
 
-  (define* (respond-html bindings source #:optional (headers (list)))
+  (define* (respond-html request bindings source #:optional (headers (list)))
     "list list:client-html-source [list] -> vector:swa-http-response
      respond with status code 200 and content type text/html"
     (respond 200 (pair "content-type:text/html\r\n" headers)
-      (l (client) (client-html client bindings source))))
+      (l (client) (client-html (swa-http-request-swa-env request) client bindings source))))
 
   (define* (nginx-respond-file path #:optional mime-type)
     "string [string] -> swa-http-response
