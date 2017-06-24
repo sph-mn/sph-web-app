@@ -1,6 +1,7 @@
 (library (sph web app start)
   (export
     sph-web-app-start-description
+    swa-config-get
     swa-create
     swa-env-config
     swa-env-data
@@ -45,7 +46,8 @@
         paths)))
 
   (define (swa-config-get swa-root name)
-    ; string string -> list
+    "string string -> list
+     get a hashtable for the configuration file identified by \"name\""
     (let (path (string-append swa-root "config/" name ".scm"))
       (tree-map-lists-and-self (compose alist->hashtable list->alist)
         (primitive-eval (list (q quasiquote) (file->datums path))))))
@@ -74,9 +76,9 @@
   (define swa-env-record swa-env)
 
   (define-syntax-cases swa-start s
-    ; -> handler-result
+    ; list string/hashtable procedure any ... -> handler-result
     ; get full paths for project names using the load path, create the swa-env and call handler.
-    ( ( ( (projects ...) ...) config-name handler handler-arguments ...)
+    ( ( ( (projects ...) ...) config handler handler-arguments ...)
       (let*
         ( (projects-datum (syntax->datum (syntax ((projects ...) ...))))
           (paths-datum (swa-paths-get projects-datum))
@@ -90,7 +92,7 @@
           (let ((swa-paths (unsyntax paths))) (apply swa-link-root-files swa-paths)
             (handler
               (record swa-env (unsyntax root)
-                swa-paths (swa-config-get (unsyntax root) config-name))
+                swa-paths (if (string? config) (swa-config-get (unsyntax root) config) config))
               handler-arguments ...)))))
     ( (projects config-name handler handler-arguments ...)
       (syntax (swa-start (projects) config-name handler handler-arguments ...)))))
