@@ -1,0 +1,8 @@
+#!/usr/bin/guile
+!#
+
+; this can be left out if the project directory is already in the load-path
+(add-to-load-path (dirname (getcwd)))
+
+(import (sph web app) (project-example main))
+(swa-start (project-example) "default" swa-server-scgi swa-app)

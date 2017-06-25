@@ -1,7 +1,8 @@
 #!/usr/bin/guile
 !#
 
-;depends on "cp" and "sed"
+; depends on "cp" and "sed"
+;
 (import (sph base) (sph cli))
 (define path-project-example "/usr/share/sph/web/app/project-example")
 (define path-project-minimal "/usr/share/sph/web/app/project-minimal")
@@ -18,28 +19,39 @@
               (begin
                 (system* "cp" "--dereference"
                   "--recursive" "--preserve=mode" "--no-target-directory" source-path path)
-                (list (string-append path "branch/main.scm")))
+                ; paths where to replace the project name placeholder in
+                (map (l (a) (string-append path a))
+                  (list "branch/main.scm" "exe/start"
+                    "main.scm" "exe/test" "test/module/main.scm" "lib/main.scm")))
               (begin
                 (system* "cp" "--dereference"
                   "--preserve=mode" "--recursive" "--no-target-directory" source-path path)
-                (list))))
+                (map (l (a) (string-append path a)) (list "exe/start" "main.scm")))))
           (apply system* "sed"
-            "-i" (string-append "s/project-name/" (basename path) "/g")
-            (string-append path "main.scm") sed-file-paths)))
-      (throw (q source-path-not-found) source-path))))
+            "-i"
+            (string-append "s/project-" (if example? "example" "minimal")
+              "/" (remove-trailing-slash (basename path)) "/g")
+            sed-file-paths)))
+      (raise (pair (q source-path-not-found) source-path)))))
 
 (define (web-app options)
   (let (target-path (alist-ref options (q target)))
     (if target-path
       (let (target-path (path->full-path target-path))
-        (if (file-exists? target-path) (simple-format #t "failed: \"~A\" already exists\n" target-path)
+        (if (file-exists? target-path)
+          (simple-format #t "failed: \"~A\" already exists\n" target-path)
           (begin (create-new-project (ensure-trailing-slash target-path) options)
             (simple-format #t "created ~A\n" target-path))))
-      (begin (simple-format #t "please specify a target path or name\n") (exit)))))
+      (begin (display "please specify a target path or name\n") (exit 1)))))
 
-(define command-line-interface
-  (cli-create #:description "creates new (web app) projects"
-    #:options (list-q ((target)) (example #:description "creates an example project structure"))))
+(define (web-app-cli)
+  (let*
+    ( (cli
+        (cli-create #:description
+          "creates new (web app) projects based on project templates that are immediately functional"
+          #:options
+          (list-q ((target)) (example #:description "creates an example project structure"))))
+      (options (cli)))
+    (if (null? options) (cli (list "--help")) (web-app options))))
 
-(let (arguments (command-line-interface))
-  (if (null? arguments) (command-line-interface (list "--help")) (web-app arguments)))
+(web-app-cli)

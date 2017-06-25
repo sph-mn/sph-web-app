@@ -1,0 +1,8 @@
+(html
+  (head
+    (title (unquote (ref (q title))))
+    (unquote (ref (q head))))
+  (body
+    (unquote (ref (q top)))
+    (unquote content)
+    (unquote (ref (q bottom)))))

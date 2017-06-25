@@ -49,7 +49,7 @@
     "string string -> list
      get a hashtable for the configuration file identified by \"name\""
     (let (path (string-append swa-root "config/" name ".scm"))
-      (tree-map-lists-and-self (compose alist->hashtable list->alist)
+      (tree-map-lists-and-self (compose ht-from-alist list->alist)
         (primitive-eval (list (q quasiquote) (file->datums path))))))
 
   (define-syntax-rule (swa-paths-get projects)
@@ -92,7 +92,9 @@
           (let ((swa-paths (unsyntax paths))) (apply swa-link-root-files swa-paths)
             (handler
               (record swa-env (unsyntax root)
-                swa-paths (if (string? config) (swa-config-get (unsyntax root) config) config))
+                swa-paths
+                (if (string? config) (swa-config-get (unsyntax root) config)
+                  (or config (ht-create-symbol))))
               handler-arguments ...)))))
-    ( (projects config-name handler handler-arguments ...)
-      (syntax (swa-start (projects) config-name handler handler-arguments ...)))))
+    ( (projects config handler handler-arguments ...)
+      (syntax (swa-start (projects) config handler handler-arguments ...)))))

@@ -52,10 +52,10 @@
   (define-syntax-rule (swa-config-ref swa-env key)
     ; get the value for an unquoted config key from a swa-env object.
     ; (swa-config-ref swa-env testkey)
-    (hashtable-ref (swa-env-config swa-env) (quote key)))
+    (ht-ref (swa-env-config swa-env) (quote key)))
 
   (define-syntax-rule (swa-config-bind swa-env (key ...) body ...)
-    (hashtable-bind (swa-env-config swa-env) (key ...) body ...))
+    (ht-bind (swa-env-config swa-env) (key ...) body ...))
 
   ;-- server
 
@@ -84,7 +84,7 @@
   (define (default-server-error-handler obj resume socket) (log-message (q error) obj)
     (if (port-closed? socket) #f (resume)))
 
-  (define (swa-env? a) (and (vector? a) (= (vector-length a) (hashtable-size swa-env-record))))
+  (define (swa-env? a) (and (vector? a) (= (vector-length a) (ht-size swa-env-record))))
 
   (define-syntax-rule (call-app-init app-init swa-env)
     ; update only if result is a vector of specific length.

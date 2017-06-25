@@ -105,7 +105,7 @@
 
   (define-record swa-http-response status headers body)
 
-  (define-as swa-http-key->mime-type symbol-hashtable
+  (define-as swa-http-key->mime-type ht-create-symbol
     json "application/json"
     html "text/html" text "text/plain" style "test/css" script "text/javascript")
 
@@ -114,7 +114,7 @@
      results in a header-line for setting the response content-type.
      key has to exist in swa-http-key->mime-type. by default json, html, text, style and script are available."
     (http-header-line "content-type"
-      (string-append (hashtable-ref swa-http-key->mime-type key) ";charset=" encoding)))
+      (string-append (ht-ref swa-http-key->mime-type key) ";charset=" encoding)))
 
   (define (swa-http-response-headers-add! a . header-lines)
     "vector:swa-http-response string:header-line ... -> vector:swa-http-response

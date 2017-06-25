@@ -1,0 +1,8 @@
+#!/usr/bin/guile
+!#
+
+(import (sph) (sph test))
+(add-to-load-path (dirname (getcwd)))
+
+(let (s (test-settings-default-custom path-search (dirname (getcwd)) reporter-name (q compact)))
+  (test-execute-modules-by-prefix #:settings s (q (project-example test module))))

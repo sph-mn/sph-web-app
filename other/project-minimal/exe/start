@@ -1,3 +1,0 @@
-#!/bin/sh
-echo $PWD
-guile -c "(import (sph web app)) (swa-start-scgi)"

@@ -44,11 +44,11 @@
   (define-syntax-rule (client-output-directory swa-root) (string-append swa-root "root/"))
   (define-syntax-rule (client-output-path) "assets/")
 
-  (define-as client-format->suffixes-ht symbol-hashtable
+  (define-as client-format->suffixes-ht ht-create-symbol
     javascript (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
 
   (define-syntax-rule (client-format->suffixes format)
-    (hashtable-ref client-format->suffixes-ht format (list)))
+    (ht-ref client-format->suffixes-ht format (list)))
 
   (define (client-delete-compiled-files swa-root)
     "deletes all filles in the client data output directory with an underscore as prefix,
@@ -60,7 +60,7 @@
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
-      (map symbol->string (vector->list (hashtable-keys client-ac-config)))))
+      (map symbol->string (vector->list (ht-keys client-ac-config)))))
 
   (define (path-add-prefix a format) "string symbol -> string"
     (string-append "client/" (symbol->string format) "/" a))
@@ -91,7 +91,7 @@
   (define (prepare-sources swa-paths sources output-format enter-list?)
     "list symbol boolean -> false/list
      convert source elements of different types to strings.
-     * string: relative paths to full path
+     * string: relative paths or full path
      * list: recurse once
      * pair: (path-suffix . path) -> string
      * else: identity"
@@ -156,39 +156,39 @@
      compile sxml to xml from s-templates"
     (display "<!doctype html>" port)
     (template-fold (l (template-result . result) (sxml->xml template-result port) result)
-      (and options (hashtable-ref options (q template-bindings)))
-      (or (and options (hashtable-ref options (q template-environment))) default-env) sources))
+      (and options (ht-ref options (q template-bindings)))
+      (or (and options (ht-ref options (q template-environment))) default-env) sources))
 
   (define (s-template-sescript->javascript sources port options)
     "hashtable list port -> string
      compile sescript to javascript from s-templates"
     (let
       (sescript-load-paths
-        (or (and options (hashtable-ref options (q sescript-load-paths))) ses-default-load-paths))
+        (or (and options (ht-ref options (q sescript-load-paths))) ses-default-load-paths))
       (template-fold
         (l (template-result . result)
           (sescript->ecmascript template-result port sescript-load-paths) result)
-        (and options (hashtable-ref options (q template-bindings)))
-        (or (and options (hashtable-ref options (q template-environment))) default-env) sources)))
+        (and options (ht-ref options (q template-bindings)))
+        (or (and options (ht-ref options (q template-environment))) default-env) sources)))
 
   (define (s-template-plcss->css sources port options)
     "hashtable list port -> string
      compile plcss to css from s-templates"
     (template-fold (l (template-result . result) (plcss->css template-result port) result)
-      (and options (hashtable-ref options (q template-bindings)))
-      (or (and options (hashtable-ref options (q template-environment))) default-env) sources))
+      (and options (ht-ref options (q template-bindings)))
+      (or (and options (ht-ref options (q template-environment))) default-env) sources))
 
-  (define-as client-ac-config symbol-hashtable
+  (define-as client-ac-config ht-create-symbol
     ; the main configuration for the asset pipeline
     javascript
     (list
-      (symbol-hashtable production javascript-output-compress development javascript-output-format)
+      (ht-create-symbol production javascript-output-compress development javascript-output-format)
       (record ac-config-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
     html
-    (list (symbol-hashtable)
+    (list (ht-create-symbol)
       (record ac-config-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
     css
-    (list (symbol-hashtable production css-output-compress development css-output-format)
+    (list (ht-create-symbol production css-output-compress development css-output-format)
       (record ac-config-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   ;-- main exports
@@ -196,21 +196,21 @@
   (define (client-port swa-env port-output output-format bindings sources)
     "port symbol list:alist:template-variables list -> unspecified"
     (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format #t)))
-      (ac-compile client-ac-config (hashtable-ref (swa-env-config swa-env) (q mode) (q production))
-        port-output output-format sources (symbol-hashtable template-bindings bindings))))
+      (ac-compile client-ac-config (ht-ref (swa-env-config swa-env) (q mode) (q production))
+        port-output output-format sources (ht-create-symbol template-bindings bindings))))
 
   (define (client-file output-format swa-env bindings sources)
     "symbol list:alist:template-variables list -> string:url-path"
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
-        (mode (hashtable-ref (swa-env-config swa-env) (q mode)))
+        (mode (ht-ref (swa-env-config swa-env) (q mode)))
         (sources (prepare-sources (swa-env-paths swa-env) sources output-format #t))
         (path
           (ac-compile->file client-ac-config mode
             (string-append output-directory (client-output-path)) output-format
             sources #:only-if-newer
             (equal? mode (q production)) #:processor-options
-            (symbol-hashtable template-bindings bindings))))
+            (ht-create-symbol template-bindings bindings))))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define (client-javascript swa-env port bindings . sources)
