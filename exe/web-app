@@ -9,7 +9,7 @@
 
 (define (create-new-project path options)
   (let*
-    ( (example? (alist-q-ref options example))
+    ( (example? (alist-ref-q options example))
       (source-path (if example? path-project-example path-project-minimal)))
     (if (file-exists? source-path)
       (begin (ensure-directory-structure path)

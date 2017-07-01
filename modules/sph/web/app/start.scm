@@ -94,7 +94,8 @@
               (record swa-env (unsyntax root)
                 swa-paths
                 (if (string? config) (swa-config-get (unsyntax root) config)
-                  (or config (ht-create-symbol))))
+                  (or config (ht-create-symbol)))
+                (ht-create-symbol))
               handler-arguments ...)))))
     ( (projects config handler handler-arguments ...)
       (syntax (swa-start (projects) config handler handler-arguments ...)))))

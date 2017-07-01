@@ -10,7 +10,6 @@
     client-javascript
     client-javascript-file
     client-port
-    shtml-includes-proc
     sph-web-app-client-description)
   (import
     (ice-9 threads)
@@ -233,23 +232,4 @@
     (client-file (q css) swa-env bindings sources))
 
   (define (client-html-file swa-env bindings . sources)
-    (client-file (q html) swa-env bindings sources))
-
-  (define (shtml-includes-proc default-sources-css default-sources-javascript)
-    "(string ...) (string ...) -> procedure:{symbol procedure:{symbol -> (string ...)} -> list:shtml}
-     creates a procedure that returns sxml html for including either css or javascript,
-     depending on the format parameter. default-sources-css and default-sources-javascript will be passed to client-file.
-     default-sources-css and default-sources-javascript will always be included when the returned procedure is called.
-     sources contains additional public relative source file paths or an empty list"
-    (let-syntax
-      ( (get-sxml
-          (syntax-rule (swa-env format sources default-sources client-file create-include-sxml)
-            (map create-include-sxml
-              (append
-                (let (a (apply client-file swa-env #f default-sources)) (if a (any->list a) (list)))
-                (if sources (any->list sources) (list)))))))
-      (l (swa-env format sources) "vector symbol (string ...) -> list:sxml"
-        (if (equal? (q css) format)
-          (get-sxml swa-env format sources default-sources-css client-css-file shtml-include-css)
-          (get-sxml swa-env format
-            sources default-sources-javascript client-javascript-file shtml-include-javascript))))))
+    (client-file (q html) swa-env bindings sources)))
