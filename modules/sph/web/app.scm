@@ -170,7 +170,9 @@
 
   (define (with-response-and-string get-response client path/headers c)
     (let*
-      ( (headers (if (string? path/headers) (list (pair "request_uri" path/headers)) path/headers))
+      ( (headers
+          (if (string? path/headers)
+            (list (pair "request_uri" path/headers) (pair "request_method" "get")) path/headers))
         (response (get-response headers))
         (response-string
           (begin (swa-http-response-send response client) (get-output-string client))))
@@ -197,7 +199,7 @@
                     (l (path arguments)
                       (app-respond (record swa-http-request path arguments headers client swa-env)))))
                 client path/headers c))
-            a)))))
+            swa-env a)))))
 
   (define-syntax-rule (swa-test-http-start projects config-name swa-app test-settings c)
     (swa-start projects config-name

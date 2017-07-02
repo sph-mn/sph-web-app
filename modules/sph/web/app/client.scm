@@ -108,15 +108,18 @@
   ;
   (define (has-suffix-proc suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
   (define default-env (apply environment (list-q (sph))))
-  (define path-uglifyjs (search-env-path "uglifyjs"))
+  (define (search-env-path* a) (first-or-false (search-env-path (list a))))
+  (define path-uglifyjs (search-env-path* "uglifyjs"))
 
   (define path-csstidy
-    ;there is also clean-css, but it does not format and cssbeautify-cli did not work at all
-    (search-env-path "csstidy"))
+    ; there is also clean-css, but it does not format and cssbeautify-cli did not work at all
+    (search-env-path* "csstidy"))
 
-  (define path-html (search-env-path "html"))
+  (define path-html (search-env-path* "html"))
 
   (define (execute-files->port sources port executable . arguments)
+    "(string ...) port string string ... ->
+     run executable and write file content from sources to it and copy the result to port"
     (execute-with-pipes
       (l (in out) (begin-thread (files->port sources in) (close-port in))
         (port-copy-all out port) (close-port out))
@@ -191,25 +194,28 @@
       (record ac-config-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
 
   ;-- main exports
+  (define (prepend-swa-env swa-env bindings) (pair (pair (q swa-env) swa-env) (or bindings (list))))
 
   (define (client-port swa-env port-output output-format bindings sources)
     "port symbol list:alist:template-variables list -> unspecified"
     (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format #t)))
       (ac-compile client-ac-config (ht-ref (swa-env-config swa-env) (q mode) (q production))
-        port-output output-format sources (ht-create-symbol template-bindings bindings))))
+        port-output output-format
+        sources (ht-create-symbol template-bindings (prepend-swa-env swa-env bindings)))))
 
   (define (client-file output-format swa-env bindings sources)
     "symbol list:alist:template-variables list -> string:url-path"
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
-        (mode (ht-ref (swa-env-config swa-env) (q mode)))
+        (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
+        (when (ht-ref-q config client-file-when (if (eq? (q development) mode) (q always) (q new))))
         (sources (prepare-sources (swa-env-paths swa-env) sources output-format #t))
         (path
           (ac-compile->file client-ac-config mode
             (string-append output-directory (client-output-path)) output-format
-            sources #:only-if-newer
-            (equal? mode (q production)) #:processor-options
-            (ht-create-symbol template-bindings bindings))))
+            sources #:when
+            when #:processor-options
+            (ht-create-symbol template-bindings (prepend-swa-env swa-env bindings)))))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define (client-javascript swa-env port bindings . sources)
