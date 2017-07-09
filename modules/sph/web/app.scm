@@ -190,16 +190,16 @@
      and a procedure that will be called with the response object and the full http response string that app-respond created"
     (l (test-proc)
       (l (arguments . a)
-        (let (client (open-output-string))
-          (apply test-proc
-            (l (path/headers c)
+        (apply test-proc
+          (l (path/headers c)
+            (let (client (open-output-string))
               (with-response-and-string
                 (l (headers) "list -> swa-http-response"
                   (swa-http-parse-query headers
                     (l (path arguments)
                       (app-respond (record swa-http-request path arguments headers client swa-env)))))
-                client path/headers c))
-            swa-env a)))))
+                client path/headers c)))
+          swa-env a))))
 
   (define-syntax-rule (swa-test-http-start projects config-name swa-app test-settings c)
     (swa-start projects config-name
