@@ -41,7 +41,7 @@
       swa-paths))
 
   (define-syntax-rule (client-output-directory swa-root) (string-append swa-root "root/"))
-  (define-syntax-rule (client-output-path) "assets/")
+  (define client-output-path "assets/")
 
   (define-as client-format->suffixes-ht ht-create-symbol
     javascript (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
@@ -55,7 +55,7 @@
     (each
       (l (format)
         (let
-          (path (string-append (client-output-directory swa-root) (client-output-path) format "/"))
+          (path (string-append (client-output-directory swa-root) client-output-path format "/"))
           (if (file-exists? path)
             (directory-fold path
               (l (e result) (if (string-prefix? "_" e) (delete-file (string-append path e)))) #f))))
@@ -87,22 +87,24 @@
       (if (and path-full (file-exists? path-full)) path-full
         (begin (log-message (q error) (string-append "missing file \"" path-full "\"")) #f))))
 
-  (define (prepare-sources swa-paths sources output-format enter-list?)
-    "list symbol boolean -> false/list
-     convert source elements of different types to strings.
+  (define* (prepare-sources swa-paths sources output-format #:optional (depth 0))
+    "(string ...) list symbol [integer] -> any
+     first level:
      * string: relative paths or full path
      * list: recurse once
+     first/second level:
      * pair: (path-suffix . path) -> string
      * else: identity"
-    (and (not (null? sources))
+    (if (list? sources)
       (every-map
         (l (a)
           (cond
-            ( (string? a)
+            ( (and (string? a) (= 0 depth))
               (if (string-prefix? "/" a) a (path-relative->path-full swa-paths a output-format)))
-            ((list? a) (if enter-list? (prepare-sources swa-paths a output-format #f) a))
+            ((list? a) (if (= 0 depth) (prepare-sources swa-paths a output-format (+ 1 depth)) a))
             ((pair? a) (path-pair->path-full swa-paths a output-format)) (else a)))
-        sources)))
+        sources)
+      sources))
 
   ;-- file processing
   ;
@@ -137,17 +139,16 @@
 
   (define css-output-compress
     (if path-csstidy
-      (l (sources port options)
-        (execute-files->port sources port
+      (l (sources port options) (debug-log sources port options)
+        #;(execute-files->port sources port
           path-csstidy "-" (cli-option "template" "highest") (cli-option "silent" "true")))
       #f))
 
   (define css-output-format
     (if path-csstidy
-      (l (sources port options)
-        (l (config sources port)
-          (execute-files->port sources port
-            path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true"))))
+      (l (sources port options) (debug-log sources port options)
+        (execute-files->port sources port
+          path-csstidy "-" (cli-option "template" "default") (cli-option "silent" "true")))
       #f))
 
   (define html-output-format
@@ -180,28 +181,42 @@
       (and options (ht-ref options (q template-bindings)))
       (or (and options (ht-ref options (q template-environment))) default-env) sources))
 
+  (define (string-and-suffix-proc suffix) (l (a) (and (string? a) (string-suffix? suffix a))))
+
+  (define (string-and-suffix-or-true-proc suffix)
+    (l (a) (if (string? a) (string-suffix? suffix a) #t)))
+
+  ; todo: either continue support of mode in asset-compiler, or create something here that selects it
+  (define (dispatch-output-processor mode)
+    (l () #t)
+    )
+
   (define-as client-ac-config ht-create-symbol
     ; the main configuration for the asset pipeline
+    html
+    (list (ht-create-symbol) (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
+      (vector (q sxml) (string-and-suffix-or-true-proc ".sxml") s-template-sxml->html))
+    css
+    (list (ht-create-symbol production css-output-compress development css-output-format)
+      (vector (q css) (string-and-suffix-proc ".css") ac-input-copy)
+      (vector (q plcss) (string-and-suffix-or-true-proc ".plcss") s-template-plcss->css))
     javascript
     (list
       (ht-create-symbol production javascript-output-compress development javascript-output-format)
-      (record ac-config-input (q sescript) (has-suffix-proc ".sjs") s-template-sescript->javascript))
-    html
-    (list (ht-create-symbol)
-      (record ac-config-input "sxml" (has-suffix-proc ".sxml") s-template-sxml->html))
-    css
-    (list (ht-create-symbol production css-output-compress development css-output-format)
-      (record ac-config-input (q plcss) (has-suffix-proc ".plcss") s-template-plcss->css)))
+      (vector (q javascript) (string-and-suffix-proc ".js") ac-input-copy)
+      (vector (q sescript) (string-and-suffix-or-true-proc ".sjs") s-template-sescript->javascript)))
 
   ;-- main exports
-  (define (prepend-swa-env swa-env bindings) (pair (pair (q swa-env) swa-env) (or bindings (list))))
+
+  (define (bindings-add-swa-env swa-env bindings)
+    (pair (pair (q swa-env) swa-env) (or bindings (list))))
 
   (define (client-port swa-env port-output output-format bindings sources)
     "port symbol list:alist:template-variables list -> unspecified"
-    (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format #t)))
-      (ac-compile client-ac-config (ht-ref (swa-env-config swa-env) (q mode) (q production))
-        port-output output-format
-        sources (ht-create-symbol template-bindings (prepend-swa-env swa-env bindings)))))
+    (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format)))
+      (ac-compile client-ac-config output-format
+        (ht-ref (swa-env-config swa-env) (q mode) (q production)) sources
+        port-output (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)))))
 
   (define (client-file output-format swa-env bindings sources)
     "symbol list:alist:template-variables list -> string:url-path"
@@ -209,13 +224,13 @@
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
         (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
         (when (ht-ref-q config client-file-when (if (eq? (q development) mode) (q always) (q new))))
-        (sources (prepare-sources (swa-env-paths swa-env) sources output-format #t))
+        (sources (prepare-sources (swa-env-paths swa-env) sources output-format))
         (path
-          (ac-compile->file client-ac-config mode
-            (string-append output-directory (client-output-path)) output-format
-            sources #:when
+          (ac-compile->file client-ac-config output-format
+            mode sources
+            (string-append output-directory client-output-path) #:when
             when #:processor-options
-            (ht-create-symbol template-bindings (prepend-swa-env swa-env bindings)))))
+            (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)))))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define (client-javascript swa-env port bindings . sources)
