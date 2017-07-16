@@ -102,7 +102,7 @@
      * list: recurse once
      first/second level:
      * pair: (path-suffix . path) -> string
-     * else: identity"
+    * else: identity"
     (if (list? sources)
       (every-map
         (l (a)
