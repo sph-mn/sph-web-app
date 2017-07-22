@@ -12,6 +12,8 @@
     swa-http-request
     swa-http-request-client
     swa-http-request-cookie
+    swa-http-request-data
+    swa-http-request-data-set!
     swa-http-request-headers
     swa-http-request-https?
     swa-http-request-if-modified-since
@@ -57,7 +59,7 @@
   ;
   ;-- request
   ;
-  (define-record swa-http-request path query headers client swa-env)
+  (define-record swa-http-request path query headers client swa-env data)
 
   (define (swa-http-request-cookie request) "vector -> alist:parsed-cookie"
     (and-let*
@@ -156,14 +158,12 @@
     (each (l (line) (display line client)) (swa-http-response-headers response))
     (swa-http-response-send-body (swa-http-response-body response) client))
 
-  (define-record swa-http-request path query headers client swa-env)
-
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
      receives a request and applies app-respond with a request object and sends the response"
     (swa-http-response-send
       (app-respond
-        (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env))
+        (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env #f))
       client))
 
   (define (swa-http-respond-query swa-env app-respond headers client)
