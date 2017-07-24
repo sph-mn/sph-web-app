@@ -15,11 +15,6 @@
     (sph record)
     (only (sph tree) tree-map-lists-and-self))
 
-  (define* (swa-create respond #:optional init deinit)
-    "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
-     create a swa-app object that encapsulates the applications respond creation, initialise and deinitialise procedure"
-    (list respond (or init identity) (or deinit identity)))
-
   (define sph-web-app-start-description
     "core web app initialisation
      before using swa-start, import (sph web app) and the main module of the current project, for example with (import (sph web app) (myproject main))
@@ -32,6 +27,11 @@
      (swa-start ((myproject) (mymodules animportedproject)) \"development\" swa-scgi)
      or
      (swa-start ((a) (b) (c d)) \"development\" swa-scgi)")
+
+  (define* (swa-create respond #:optional init deinit)
+    "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
+     create a swa-app object that encapsulates the applications respond creation, initialise and deinitialise procedure"
+    (list respond (or init identity) (or deinit identity)))
 
   (define (swa-link-root-files swa-root . paths)
     "symlink non-generated files from the imports root-directories into the current root.
