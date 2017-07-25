@@ -32,14 +32,16 @@
     (sxml simple))
 
   (define sph-web-app-client-description
-    "client-code processing
-     transport protocol agnostic, it writes to a port or returns the path of a prepared file.
-     for the format for sources that can be passed see the documentation of (sph lang template)
-     (sph web app client) extends the template-source format to support non-list pairs as arguments:
-     example: (string:swa-path-suffix . relative-path)
-     the first element selects the swa-path to use based on its suffix.
-     source-path template: {swa-path}/client/{output-format}/{path-suffix}
-     destination-path template: {swa-root}/root/assets/{output-format}/_{sources-dependent-name}
+    "client-code processing. create target language files from templates and source files of varying formats with pre-processing.
+     # sources
+     the data structure given as sources depends on the input processor for the associated input format.
+     ## s-template formats
+     the sxml, plcss and sescript is configured to use (sph lang template) and its template-fold source format with template bindings.
+     the template-fold source format is configured to resolve relative paths relative to a web-app project.
+     the source path is constructed with this template: {swa-path}/client/{output-format}/{path-suffix}.
+     additionally, non-list pairs are supported as arguments:
+     example: (symbol/(symbol...):project-id . relative-path)
+     this is for selecting files from other web-app projects.
      # syntax
      client-static-config-create :: symbol/(symbol ...) (output-format symbol:bundle-id/(list:template-bindings any:source ...) ...) ...
        creates a configuration object for client-static-compile.
@@ -79,48 +81,46 @@
   (define (path-add-prefix a format) "string symbol -> string"
     (string-append "client/" (symbol->string format) "/" a))
 
-  (define (path-relative->path-full swa-paths path format)
-    (let*
-      ( (path (path-add-prefix path format))
-        (path
-          (or (swa-paths-search swa-paths path)
-            (any (l (suffix) (swa-paths-search swa-paths (string-append path suffix)))
-              (client-format->suffixes format))
-            (begin (log-message (q error) (string-append "missing file \"" path "\"")) #f))))
-      (if path (string-append (first path) "/" (tail path)))))
+  (define (path-find-with-suffix a format-suffixes)
+    (or (and (file-exists? a) a)
+      (any (l (suffix) (let (b (string-append a suffix)) (and (file-exists? b) b))) format-suffixes)))
 
-  (define (path-pair->path-full swa-paths a format)
+  (define (log-missing-file a) (log-message (q error) (string-append "missing file \"" a "\"")) #f)
+
+  (define (path-relative->path-full swa-root path format format-suffixes)
+    (let*
+      ( (path (string-append swa-root (path-add-prefix path format)))
+        (found-path (path-find-with-suffix path format-suffixes)))
+      (if found-path found-path (log-missing-file path))))
+
+  (define (path-pair->path-full swa-paths a format format-suffixes)
     "(string:path-suffix . string:path) symbol -> false/string
      suffix is of a swa-path"
-    (let*
-      ( (path-suffix (ensure-trailing-slash (first a)))
-        (path-full
-          (any
-            (l (b)
-              (and (string-suffix? path-suffix b)
-                (string-append b (path-add-prefix (tail a) format))))
-            swa-paths)))
-      (if (and path-full (file-exists? path-full)) path-full
-        (begin (log-message (q error) (string-append "missing file \"" path-full "\"")) #f))))
+    (path-relative->path-full (ht-ref swa-paths (first a)) (tail a) format format-suffixes))
 
-  (define* (prepare-sources swa-paths sources output-format #:optional (depth 0))
+  (define (prepare-sources default-project swa-paths sources output-format)
     "(string ...) list symbol [integer] -> any
      normalise the (sph web app client) sources format to the (sph lang template) template-fold sources format.
      first level:
      * string: relative paths or full path
      * list: recurse once
      first/second level:
-     * pair: (path-suffix . path) -> string
+     * pair: (project-id . path) -> string
      * else: identity"
     (if (list? sources)
-      (every-map
-        (l (a)
-          (cond
-            ( (and (string? a) (= 0 depth))
-              (if (string-prefix? "/" a) a (path-relative->path-full swa-paths a output-format)))
-            ((list? a) (if (= 0 depth) (prepare-sources swa-paths a output-format (+ 1 depth)) a))
-            ((pair? a) (path-pair->path-full swa-paths a output-format)) (else a)))
-        sources)
+      (let
+        ( (default-root (ht-ref swa-paths (swa-project-id->symbol* default-project)))
+          (format-suffixes (client-format->suffixes output-format)))
+        (let loop ((sources sources) (depth 0))
+          (every-map
+            (l (a)
+              (cond
+                ( (and (string? a) (= 0 depth))
+                  (if (string-prefix? "/" a) a
+                    (path-relative->path-full default-root a output-format format-suffixes)))
+                ((list? a) (if (= 0 depth) (loop a (+ 1 depth)) a))
+                ((pair? a) (path-pair->path-full swa-paths a output-format format-suffixes)) (else a)))
+            sources)))
       sources))
 
   ;-- file processing
@@ -249,22 +249,25 @@
   (define (bindings-add-swa-env swa-env bindings)
     (pair (pair (q swa-env) swa-env) (or bindings (list))))
 
-  (define (client-port output-format port-output swa-env bindings sources)
+  (define (client-port swa-env output-format port-output bindings default-project-id sources)
     "port symbol list:alist:template-variables list -> unspecified"
-    (and-let* ((sources (prepare-sources (swa-env-paths swa-env) sources output-format)))
+    (and-let*
+      ((sources (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format)))
       (ac-compile client-ac-config output-format
         sources port-output
         (ht-create-symbol mode (ht-ref (swa-env-config swa-env) (q mode) (q production))
           template-bindings (bindings-add-swa-env swa-env bindings)))))
 
-  (define (client-file output-format swa-env bindings sources)
-    "symbol list:alist:template-variables list -> string:url-path
-     sources are given in (sph lang template) template-fold source format"
+  (define (client-file swa-env output-format bindings default-project-id sources)
+    "symbol false/list:alist:template-variables list -> string:url-path
+     destination-path template: {swa-root}/root/assets/{output-format}/_{sources-dependent-name}"
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
         (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
         (when (ht-ref-q config client-file-when (if (eq? (q development) mode) (q always) (q new))))
-        (sources (prepare-sources (swa-env-paths swa-env) sources output-format))
+        (sources
+          (debug-log
+            (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format)))
         (path
           (ac-compile->file client-ac-config output-format
             sources (string-append output-directory client-output-path)
@@ -273,45 +276,40 @@
             (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)))))
       (string-append "/" (string-drop-prefix output-directory path))))
 
-  (define (client-js swa-env port bindings . sources)
+  (define (client-js swa-env port bindings project . sources)
     "port list:alist:template-variables string ... -> unspecified
      like client-port with output format \"js\""
-    (client-port (q js) port swa-env bindings sources))
+    (client-port swa-env (q js) port bindings project sources))
 
-  (define (client-css swa-env port bindings . sources)
-    (client-port (q css) port swa-env bindings sources))
+  (define (client-css swa-env port bindings project . sources)
+    (client-port swa-env (q css) port bindings project sources))
 
-  (define (client-html swa-env port bindings . sources)
-    (client-port (q html) port swa-env bindings sources))
+  (define (client-html swa-env port bindings project . sources)
+    (client-port swa-env (q html) port bindings project sources))
 
-  (define (client-js-file swa-env bindings . sources)
+  (define (client-js-file swa-env bindings project . sources)
     "list:alist:template-variables string ... -> url-path
      like client-file with output format \"js\""
-    (client-file (q js) swa-env bindings sources))
+    (client-file swa-env (q js) bindings project sources))
 
-  (define (client-css-file swa-env bindings . sources)
-    (client-file (q css) swa-env bindings sources))
+  (define (client-css-file swa-env bindings project . sources)
+    (client-file swa-env (q css) bindings project sources))
 
-  (define (client-html-file swa-env bindings . sources)
-    (client-file (q html) swa-env bindings sources))
+  (define (client-html-file swa-env bindings project . sources)
+    (client-file swa-env (q html) bindings project sources))
 
   ;-- pre-compilation with configuration object
+  ;
+  (define (swa-project-id->symbol* a) (if (symbol? a) a (swa-project-id->symbol a)))
 
-  (define-syntax-case (project-id->symbol a) s
-    ; symbol/(symbol ...) -> symbol
-    ; if project-id is not a symbol but a list with symbols, join the list elements separated by "-" to create a new symbol.
-    ; this is done to be able to use eq? with the resulting identifier, list literals did not work
-    (let (b (syntax->datum (syntax a)))
-      (if (symbol? b) (syntax (quote a))
-        (datum->syntax s (list (q quote) (string->symbol (string-join (map symbol->string b) "-")))))))
+  (define-syntax-rules client-static-config-create
+    ( ( (project-id-part ...) (output-format bundle-id/sources ...) ...)
+      (client-static-config-create-p (q (project-id-part ...))
+        (qq ((output-format bundle-id/sources ...) ...))))
+    ((project-id a ...) (client-static-config-create (project-id) a ...)))
 
-  (define-syntax-rule
-    (client-static-config-create project-id (output-format bundle-id/sources ...) ...)
-    (client-static-config-create-p (project-id->symbol project-id)
-      (qq ((output-format bundle-id/sources ...) ...))))
-
-  (define-syntax-rule (client-static swa-env project-id format bundle-ids)
-    (client-static-p swa-env (project-id->symbol project-id) format bundle-ids))
+  (define-syntax-rule (client-static swa-env project-id format (bundle-id ...))
+    (client-static-p swa-env (q project-id) (q format) (q (bundle-id ...))))
 
   (define (client-static-config-create-p project-id data) "symbol list -> list"
     (pair project-id
@@ -330,7 +328,7 @@
           (ht-ref (swa-env-data swa-env) (q client-static)
             (let (a (ht-make-eq)) (ht-set! (swa-env-data swa-env) (q client-static) a) a)))
         (project-id (first config)) (format-config (tail config)) (project-ht (ht-make-eq)))
-      (ht-set! data-ht project-id project-ht)
+      (ht-set! data-ht (swa-project-id->symbol* project-id) project-ht)
       (each
         (l (a)
           (let ((output-format (first a)) (bundle-config (tail a)) (format-ht (ht-make-eq)))
@@ -339,13 +337,16 @@
               (l (a)
                 (let ((key (first a)) (bindings-and-sources (tail a)))
                   (ht-set! format-ht key
-                    (client-file output-format swa-env
-                      (first bindings-and-sources) (tail bindings-and-sources)))))
+                    (client-file swa-env output-format
+                      (first bindings-and-sources) project-id (tail bindings-and-sources)))))
               bundle-config)))
         format-config)))
 
   (define (client-static-p swa-env project-id format bundle-ids)
     "vector symbol symbol symbol -> false/string
      get compiled source paths for bundle-ids"
-    (let (format-ht (ht-tree-ref (swa-env-data swa-env) (q client-static) project-id format))
+    (let
+      (format-ht
+        (ht-tree-ref (swa-env-data swa-env) (q client-static)
+          (swa-project-id->symbol* project-id) format))
       (map (l (a) (ht-ref format-ht a)) bundle-ids))))

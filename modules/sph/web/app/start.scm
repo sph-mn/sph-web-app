@@ -9,7 +9,9 @@
     swa-env-paths
     swa-env-record
     swa-env-root
-    swa-start)
+    swa-project-id->symbol
+    swa-start
+    swa-start-p)
   (import
     (sph base)
     (sph record)
@@ -27,6 +29,14 @@
      (swa-start ((myproject) (mymodules animportedproject)) \"development\" swa-scgi)
      or
      (swa-start ((a) (b) (c d)) \"development\" swa-scgi)")
+
+  (define (swa-project-id->symbol a)
+    "(symbol ...) -> symbol
+     if project-id is not a symbol but a list with symbols, join the list elements separated by \"-\" to create a new symbol.
+     this is done to be able to use eq? with the resulting identifier, list literals did not work"
+    (string->symbol (string-join (map symbol->string a) "-")))
+
+  (define (swa-project-id->relative-path a) (string-join (map symbol->string a) "/"))
 
   (define* (swa-create respond #:optional init deinit)
     "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
@@ -52,50 +62,47 @@
       (tree-map-lists-and-self (compose ht-from-alist list->alist)
         (primitive-eval (list (q quasiquote) (file->datums path))))))
 
-  (define-syntax-rule (swa-paths-get projects)
-    ; ((symbol ...) ...) -> (string ...)
-    ; convert project names to full paths.
-    ; the current project is included
-    (filter-map
-      (l (a)
-        (let (relative-path (string-join (map symbol->string a) "/"))
-          (any
-            (l (load-path)
-              (let (path (string-append load-path "/" relative-path))
-                (and (file-exists? path) (ensure-trailing-slash path))))
-            %load-path)))
-      projects))
-
-  (define-syntax-rule (swa-require-load-path paths-datum projects-datum)
-    (if (null? paths-datum)
-      (raise
-        (list (q project-not-in-load-path) "this is required for loading application parts"
-          (q search-paths) %load-path (q projects) projects-datum))))
+  (define (swa-paths-get projects)
+    "((symbol ...) ...) -> hashtable:{symbol:project-id-symbol -> string:swa-root}
+     convert project names to full paths.
+     the current project is included"
+    (let (project-ht (ht-make-eq))
+      (list
+        (map
+          (l (id)
+            (let*
+              ( (relative-path (swa-project-id->relative-path id))
+                (found-path
+                  (any
+                    (l (load-path)
+                      (let (path (string-append load-path "/" relative-path))
+                        (and (file-exists? path) (ensure-trailing-slash path))))
+                    %load-path)))
+              (if found-path
+                (begin (ht-set! project-ht (swa-project-id->symbol id) found-path) found-path)
+                (raise
+                  (list (q project-not-in-load-path)
+                    "this is required for loading application parts" (q search-paths)
+                    %load-path (q projects) projects)))))
+          projects)
+        project-ht)))
 
   (define-record swa-env root paths config data)
   (define swa-env-record swa-env)
 
-  (define-syntax-cases swa-start s
-    ; list string/hashtable procedure any ... -> handler-result
-    ; get full paths for project names using the load path, create the swa-env and call handler.
-    ( ( ( (projects ...) ...) config handler handler-arguments ...)
-      (let*
-        ( (projects-datum (syntax->datum (syntax ((projects ...) ...))))
-          (paths-datum (swa-paths-get projects-datum))
-          (paths (datum->syntax s (pair (q list) paths-datum)))
-          (root (datum->syntax s (first paths-datum))))
-        (swa-require-load-path paths-datum projects-datum)
-        ; unfortunately, importing the main module and calling app-init/app-deinit did not
-        ; work as it does not seem reasonably possible to make the bindings available here
-        ; without run-time module loading.
-        (quasisyntax
-          (let ((swa-paths (unsyntax paths))) (apply swa-link-root-files swa-paths)
-            (handler
-              (record swa-env (unsyntax root)
-                swa-paths
-                (if (string? config) (swa-config-get (unsyntax root) config)
-                  (or config (ht-create-symbol)))
-                (ht-create-symbol))
-              handler-arguments ...)))))
-    ( (projects config handler handler-arguments ...)
-      (syntax (swa-start (projects) config handler handler-arguments ...)))))
+  (define (swa-start-p projects config proc . arguments)
+    "list string/hashtable procedure any ... -> proc-result
+     get full paths for project names using the load path, create the swa-env and call proc"
+    (list-bind (swa-paths-get projects) (paths project-ht)
+      (apply swa-link-root-files paths)
+      (apply proc
+        (let (root (first paths))
+          (record swa-env root
+            project-ht
+            (if (string? config) (swa-config-get root config) (or config (ht-create-symbol)))
+            (ht-create-symbol)))
+        arguments)))
+
+  (define-syntax-rules swa-start
+    ((((project-id-part ...) ...) a ...) (swa-start-p (q ((project-id-part ...) ...)) a ...))
+    (((project-id-part ...) a ...) (swa-start ((project-id-part ...)) a ...))))
