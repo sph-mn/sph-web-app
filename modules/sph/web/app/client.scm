@@ -2,13 +2,13 @@
   (export
     client-ac-config
     client-css
-    client-css-file
     client-delete-compiled-files
     client-file
+    client-file-css
+    client-file-html
+    client-file-js
     client-html
-    client-html-file
     client-js
-    client-js-file
     client-port
     client-static
     client-static-compile
@@ -271,8 +271,8 @@
             sources (string-append output-directory client-output-path)
             #:when when
             #:processor-options
-            (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)) #:dest-name
-            file-name)))
+            (ht-create-symbol mode mode template-bindings (bindings-add-swa-env swa-env bindings))
+            #:dest-name file-name)))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define (client-js swa-env port bindings project . sources)
@@ -286,15 +286,15 @@
   (define (client-html swa-env port bindings project . sources)
     (client-port swa-env (q html) port bindings project sources))
 
-  (define (client-js-file swa-env bindings project . sources)
+  (define (client-file-js swa-env bindings project . sources)
     "list:alist:template-variables string ... -> url-path
      like client-file with output format \"js\""
     (client-file swa-env (q js) bindings project sources))
 
-  (define (client-css-file swa-env bindings project . sources)
+  (define (client-file-css swa-env bindings project . sources)
     (client-file swa-env (q css) bindings project sources))
 
-  (define (client-html-file swa-env bindings project . sources)
+  (define (client-file-html swa-env bindings project . sources)
     (client-file swa-env (q html) bindings project sources))
 
   ;-- pre-compilation with configuration object
