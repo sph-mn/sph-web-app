@@ -9,25 +9,26 @@
 
   (define swa-env
     (record swa-env-record "/tmp/"
-      (list "/tmp/") (ht-create-symbol mode (q production)) (ht-create-symbol)))
+      (ht-create-symbol (q test) "/tmp/") (ht-create-symbol mode (q production)) (ht-create-symbol)))
 
   (define-test (client-html)
     (assert-equal "<!doctype html><div>test</div>"
-      (call-with-output-string (l (out) (client-html swa-env out #f (list-q ((div "test"))))))))
+      (call-with-output-string
+        (l (out) (client-html swa-env out #f (q test) (list-q ((div "test"))))))))
 
   (define-test (client-css)
     (assert-equal "div{display:none;}\n"
       (call-with-output-string
-        (l (out) (client-css swa-env out #f (list-q ((("div" display none)))))))))
+        (l (out) (client-css swa-env out #f (q test) (list-q ((("div" display none)))))))))
 
-  (define-test (client-javascript)
+  (define-test (client-js)
     (assert-equal "var a=3;\n"
       (call-with-output-string
-        (l (out) (client-javascript swa-env out #f (list (list (list-q (define a 3)))))))))
+        (l (out) (client-js swa-env out #f (q test) (list (list (list-q (define a 3)))))))))
 
   (define-test (client-file)
-    (and-let* ((path (client-html-file swa-env #f (list-q ((div "test"))))))
+    (and-let* ((path (client-file-html swa-env #f (q test) (list-q ((div "test"))))))
       (assert-equal "<!doctype html><div>test</div>"
         (file->string (string-append (swa-env-root swa-env) "root" path)))))
 
-  (test-execute-procedures-lambda client-file client-javascript client-css client-html))
+  (test-execute-procedures-lambda client-file client-js client-css client-html))
