@@ -6,6 +6,7 @@
     respond-html
     respond-type
     sph-web-app-http-description
+    swa-http-client-static
     swa-http-create-response
     swa-http-header-content-type
     swa-http-parse-query
@@ -188,6 +189,9 @@
     (respond 200 (pair "content-type:text/html\r\n" headers)
       (let (swa-env (swa-http-request-swa-env request))
         (l (client) (client-html swa-env client bindings source)))))
+
+  (define-syntax-rule (swa-http-client-static request a ...)
+    (client-static (swa-http-request-swa-env request) a ...))
 
   (define* (nginx-respond-file path #:optional mime-type)
     "string [string] -> swa-http-response

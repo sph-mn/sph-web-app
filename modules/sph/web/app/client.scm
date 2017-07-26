@@ -14,7 +14,6 @@
     client-static-compile
     client-static-config-create
     client-static-config-create-p
-    client-static-p
     sph-web-app-client-description)
   (import
     (ice-9 threads)
@@ -242,7 +241,7 @@
       (vector (q plcss) (string-and-suffix-or-true-proc ".plcss") s-template-plcss->css))
     js
     (list js-output-processor (vector (q js) (string-and-suffix-proc ".js") ac-input-copy)
-      (vector (q sescript) (string-and-suffix-or-true-proc ".sjs") s-template-sescript->js)))
+      (vector (q sjs) (string-and-suffix-or-true-proc ".sjs") s-template-sescript->js)))
 
   ;-- main exports
 
@@ -258,22 +257,22 @@
         (ht-create-symbol mode (ht-ref (swa-env-config swa-env) (q mode) (q production))
           template-bindings (bindings-add-swa-env swa-env bindings)))))
 
-  (define (client-file swa-env output-format bindings default-project-id sources)
+  (define*
+    (client-file swa-env output-format bindings default-project-id sources #:optional file-name)
     "symbol false/list:alist:template-variables list -> string:url-path
      destination-path template: {swa-root}/root/assets/{output-format}/_{sources-dependent-name}"
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
         (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
         (when (ht-ref-q config client-file-when (if (eq? (q development) mode) (q always) (q new))))
-        (sources
-          (debug-log
-            (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format)))
+        (sources (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format))
         (path
           (ac-compile->file client-ac-config output-format
             sources (string-append output-directory client-output-path)
             #:when when
             #:processor-options
-            (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)))))
+            (ht-create-symbol template-bindings (bindings-add-swa-env swa-env bindings)) #:dest-name
+            file-name)))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define (client-js swa-env port bindings project . sources)
@@ -308,13 +307,10 @@
         (qq ((output-format bundle-id/sources ...) ...))))
     ((project-id a ...) (client-static-config-create (project-id) a ...)))
 
-  (define-syntax-rule (client-static swa-env project-id format (bundle-id ...))
-    (client-static-p swa-env (q project-id) (q format) (q (bundle-id ...))))
-
   (define (client-static-config-create-p project-id data) "symbol list -> list"
     (pair project-id
       (map
-        (l (a) "(output-format key/sources ...) -> unspecified"
+        (l (a) "(bundle-id format/sources ...) -> unspecified"
           (pair (first a) (list->alist (tail a))))
         data)))
 
@@ -327,26 +323,26 @@
       ( (data-ht
           (ht-ref (swa-env-data swa-env) (q client-static)
             (let (a (ht-make-eq)) (ht-set! (swa-env-data swa-env) (q client-static) a) a)))
-        (project-id (first config)) (format-config (tail config)) (project-ht (ht-make-eq)))
+        (project-id (first config)) (bundles (tail config)) (project-ht (ht-make-eq)))
       (ht-set! data-ht (swa-project-id->symbol* project-id) project-ht)
       (each
         (l (a)
-          (let ((output-format (first a)) (bundle-config (tail a)) (format-ht (ht-make-eq)))
-            (ht-set! project-ht output-format format-ht)
+          (let ((bundle (first a)) (format-and-source (tail a)) (format-ht (ht-make-eq)))
+            (ht-set! project-ht bundle format-ht)
             (each
               (l (a)
-                (let ((key (first a)) (bindings-and-sources (tail a)))
-                  (ht-set! format-ht key
-                    (client-file swa-env output-format
-                      (first bindings-and-sources) project-id (tail bindings-and-sources)))))
-              bundle-config)))
-        format-config)))
+                (let ((format (first a)) (bindings-and-sources (tail a)))
+                  (ht-set! format-ht format
+                    (client-file swa-env format
+                      (first bindings-and-sources) project-id
+                      (tail bindings-and-sources) (string-append "_" (symbol->string bundle))))))
+              format-and-source)))
+        bundles)))
 
-  (define (client-static-p swa-env project-id format bundle-ids)
+  (define (client-static swa-env project-id format bundle-ids)
     "vector symbol symbol symbol -> false/string
      get compiled source paths for bundle-ids"
     (let
-      (format-ht
-        (ht-tree-ref (swa-env-data swa-env) (q client-static)
-          (swa-project-id->symbol* project-id) format))
-      (map (l (a) (ht-ref format-ht a)) bundle-ids))))
+      (bundle-ht
+        (ht-tree-ref (swa-env-data swa-env) (q client-static) (swa-project-id->symbol* project-id)))
+      (map (l (a) (ht-ref (ht-ref bundle-ht a) format)) bundle-ids))))
