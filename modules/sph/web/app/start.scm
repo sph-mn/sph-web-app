@@ -62,7 +62,7 @@
       (tree-map-lists-and-self (compose ht-from-alist list->alist)
         (primitive-eval (list (q quasiquote) (file->datums path))))))
 
-  (define (swa-paths-get projects)
+  (define (swa-paths-get projects web-app-load-paths)
     "((symbol ...) ...) -> hashtable:{symbol:project-id-symbol -> string:swa-root}
      convert project names to full paths.
      the current project is included"
@@ -77,23 +77,23 @@
                     (l (load-path)
                       (let (path (string-append load-path "/" relative-path))
                         (and (file-exists? path) (ensure-trailing-slash path))))
-                    %load-path)))
+                    web-app-load-paths)))
               (if found-path
                 (begin (ht-set! project-ht (swa-project-id->symbol id) found-path) found-path)
                 (raise
-                  (list (q project-not-in-load-path)
-                    "this is required for loading application parts" (q search-paths)
-                    %load-path (q projects) projects)))))
+                  (list (q project-not-found) "project not found in any given web-app load-path"
+                    (q search-paths) web-app-load-paths (q projects) projects)))))
           projects)
         project-ht)))
 
   (define-record swa-env root paths config data)
   (define swa-env-record swa-env)
 
-  (define (swa-start-p projects config proc . arguments)
-    "list string/hashtable procedure any ... -> proc-result
-     get full paths for project names using the load path, create the swa-env and call proc"
-    (list-bind (swa-paths-get projects) (paths project-ht)
+  (define (swa-start-p web-app-load-paths projects config proc . arguments)
+    "(string) list string/hashtable procedure any ... -> proc-result
+     get full paths for project names using the load path, create the swa-env and call proc.
+     web-app-load-paths is for locating client files and linking assets"
+    (list-bind (swa-paths-get projects (any->list web-app-load-paths)) (paths project-ht)
       (apply swa-link-root-files paths)
       (apply proc
         (let (root (first paths))
@@ -104,5 +104,7 @@
         arguments)))
 
   (define-syntax-rules swa-start
-    ((((project-id-part ...) ...) a ...) (swa-start-p (q ((project-id-part ...) ...)) a ...))
-    (((project-id-part ...) a ...) (swa-start ((project-id-part ...)) a ...))))
+    ( (web-app-load-paths ((project-id-part ...) ...) a ...)
+      (swa-start-p web-app-load-paths (q ((project-id-part ...) ...)) a ...))
+    ( (web-app-load-paths (project-id-part ...) a ...)
+      (swa-start web-app-load-paths ((project-id-part ...)) a ...))))

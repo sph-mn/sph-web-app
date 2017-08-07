@@ -201,8 +201,8 @@
                 client path/headers c)))
           swa-env a))))
 
-  (define-syntax-rule (swa-test-http-start projects config-name swa-app test-settings c)
-    (swa-start projects config-name
+  (define-syntax-rule (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
+    (swa-start web-app-load-paths projects config-name
       swa-server-internal swa-app
       (l (swa-env app-respond)
         (let
