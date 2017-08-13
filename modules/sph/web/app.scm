@@ -8,6 +8,7 @@
     swa-config-ref
     swa-create
     swa-env-config
+    swa-env-config-set!
     swa-env-data
     swa-env-data-set!
     swa-env-paths
@@ -201,9 +202,11 @@
                 client path/headers c)))
           swa-env a))))
 
-  (define-syntax-rule (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
-    (swa-start web-app-load-paths projects config-name
-      swa-server-internal swa-app
+  (define-syntax-rule
+    (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
+    (swa-start web-app-load-paths projects
+      config-name swa-server-internal
+      swa-app
       (l (swa-env app-respond)
         (let
           ( (procedure-wrap (alist-ref test-settings (q procedure-wrap)))

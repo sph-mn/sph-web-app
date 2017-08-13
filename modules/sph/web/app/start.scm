@@ -4,6 +4,7 @@
     swa-config-get
     swa-create
     swa-env-config
+    swa-env-config-set!
     swa-env-data
     swa-env-data-set!
     swa-env-paths
@@ -13,9 +14,15 @@
     swa-start
     swa-start-p)
   (import
-    (sph base)
+    (rnrs exceptions)
+    (sph)
+    (sph filesystem)
+    (sph hashtable)
+    (sph lang config)
+    (sph list)
     (sph record)
-    (only (sph tree) tree-map-lists-and-self))
+    (only (guile) string-join file-exists?)
+    (only (sph process) shell-eval))
 
   (define sph-web-app-start-description
     "core web app initialisation
@@ -58,9 +65,7 @@
   (define (swa-config-get swa-root name)
     "string string -> list
      get a hashtable for the configuration file identified by \"name\""
-    (let (path (string-append swa-root "config/" name ".scm"))
-      (tree-map-lists-and-self (compose ht-from-alist list->alist)
-        (primitive-eval (list (q quasiquote) (file->datums path))))))
+    (config-read-file (string-append swa-root "config/" name ".scm")))
 
   (define (swa-paths-get projects web-app-load-paths)
     "((symbol ...) ...) -> hashtable:{symbol:project-id-symbol -> string:swa-root}
