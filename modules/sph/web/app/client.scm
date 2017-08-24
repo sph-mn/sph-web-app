@@ -170,7 +170,8 @@
   (define (development-mode? options) (eq? (q development) (ht-ref-q options mode)))
 
   (define html-output-processor
-    (let (path-html (search-env-path* "html"))
+    ; disabled, because it can change how things are rendered
+    (let (path-html (and #f (search-env-path* "html")))
       (and path-html
         (l (process-input out options)
           (if (development-mode? options)
@@ -234,7 +235,8 @@
   (define-as client-ac-config ht-create-symbol
     ; the main configuration for the asset pipeline
     html
-    (list html-output-processor (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
+    (list html-output-processor
+      (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
       (vector (q sxml) (string-and-suffix-or-true-proc ".sxml") s-template-sxml->html))
     css
     (list css-output-processor (vector (q css) (string-and-suffix-proc ".css") ac-input-copy)
