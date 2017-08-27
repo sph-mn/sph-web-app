@@ -139,7 +139,8 @@
     "hashtable list port -> string
      compile sxml to xml from s-templates"
     (display "<!doctype html>" port)
-    (template-fold (l (template-result . result) (sxml->xml template-result port) result)
+    (template-fold
+      (l (template-result . result) (sxml->xml template-result port) (newline port) result)
       (and options (ht-ref options (q template-bindings)))
       (or (and options (ht-ref options (q template-environment))) default-env) source))
 
@@ -150,15 +151,16 @@
       (sescript-load-paths
         (or (and options (ht-ref-q options sescript-load-paths)) ses-default-load-paths))
       (template-fold
-        (l (template-result . result)
-          (sescript->ecmascript template-result port sescript-load-paths) result)
+        (l (template-result . result) (sescript-use-strict port)
+          (sescript->ecmascript template-result port sescript-load-paths) (newline port) result)
         (and options (ht-ref-q options template-bindings))
         (or (and options (ht-ref-q options template-environment)) default-env) sources)))
 
   (define (s-template-plcss->css source port options)
     "hashtable list port -> string
      compile plcss to css from s-templates"
-    (template-fold (l (template-result . result) (plcss->css template-result port) result)
+    (template-fold
+      (l (template-result . result) (plcss->css template-result port) (newline port) result)
       (and options (ht-ref-q options template-bindings))
       (or (and options (ht-ref-q options template-environment)) default-env) source))
 
@@ -230,13 +232,12 @@
           (l (process-input out-port options)
             ((if (development-mode? options) format compress) process-input out-port options))))))
 
-  (define (ac-input-copy source out options) (file->port source out))
+  (define (ac-input-copy source out options) (file->port source out) (newline out))
 
   (define-as client-ac-config ht-create-symbol
     ; the main configuration for the asset pipeline
     html
-    (list html-output-processor
-      (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
+    (list html-output-processor (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
       (vector (q sxml) (string-and-suffix-or-true-proc ".sxml") s-template-sxml->html))
     css
     (list css-output-processor (vector (q css) (string-and-suffix-proc ".css") ac-input-copy)
