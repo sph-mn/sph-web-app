@@ -20,6 +20,7 @@
     swa-start
     swa-start-p)
   (import
+    (guile)
     (rnrs exceptions)
     (sph)
     (sph filesystem)
@@ -27,14 +28,7 @@
     (sph lang config)
     (sph list)
     (sph record)
-    (only (guile)
-      string-join
-      file-exists?
-      dirname
-      string-suffix?
-      %load-path)
-    (only (sph process) shell-eval)
-    (only (sph string) string-equal?))
+    (sph string))
 
   (define sph-web-app-start-description
     "core web app initialisation
@@ -72,13 +66,18 @@
   (define (swa-link-root-files swa-root paths)
     "symlink non-generated files from the imports root-directories into the current root.
      currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
-    (let (dest (string-append swa-root "root")) (ensure-directory-structure dest)
+    (let (dest (string-append swa-root "root/")) (ensure-directory-structure dest)
       (each
         (l (other-root)
-          (shell-eval
-            (string-append
-              "cp --recursive --no-clobber --dereference --symbolic-link --target-directory=" dest
-              (string-append other-root "root/*") " 2> /dev/null")))
+          (let (other-root (string-append other-root "root/"))
+            (directory-tree-each
+              (l (a stat-info)
+                (let (name (basename a))
+                  (if (not (string-prefix? "_" name))
+                    (let (b (string-append dest (string-drop-prefix other-root a)))
+                      (and (not (file-exists? b)) (ensure-directory-structure (dirname b))
+                        (symlink a b))))))
+              other-root)))
         paths)))
 
   (define (swa-config-get-file swa-root name)

@@ -267,7 +267,8 @@
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
         (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
-        (when (ht-ref-q config client-file-when (if (eq? (q development) mode) (q always) (q new))))
+        (when
+          (or (ht-ref-q config client-file-when) (if (eq? (q development) mode) (q always) (q new))))
         (sources (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format))
         (path
           (ac-compile->file client-ac-config output-format
@@ -321,7 +322,7 @@
     "vector list -> unspecified
      pre-compile the static client files to be served and save result file paths in swa-data.
      creates a nested hashtable structure in swa-data with the following hierarchy:
-     (client-static project-id output-format bundle-id compiled-source-path)"
+     (client-static project-id-symbol bundle-id output-format compiled-source-path)"
     (let*
       ( (data-ht
           (or (ht-ref (swa-env-data swa-env) (q client-static))
