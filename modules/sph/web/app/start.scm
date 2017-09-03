@@ -63,7 +63,8 @@
      #:init procedure:{vector:swa-env -> swa-env}
      #:deinit procedure:{vector:swa-env -> swa-env}
      #:depends (symbol/(symbol ...) ...)
-     create a swa-app object that encapsulates the applications main procedures, name and names of dependencies"
+     create a swa-app object that encapsulates the applications main procedures, name and names of dependencies.
+     name is the module name of the main module"
     (record swa-app (any->list name)
       respond (or init identity)
       (or deinit identity) (or (and depends (map any->list (any->list depends))) null)))

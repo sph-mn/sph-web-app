@@ -322,12 +322,14 @@
      pre-compile the static client files to be served and save result file paths in swa-data.
      creates a nested hashtable structure in swa-data with the following hierarchy:
      (client-static project-id output-format bundle-id compiled-source-path)"
-    (let
+    (let*
       ( (data-ht
-          (ht-ref (swa-env-data swa-env) (q client-static)
-            (let (a (ht-make-eq)) (ht-set! (swa-env-data swa-env) (q client-static) a) a)))
-        (project-id (first config)) (bundles (tail config)) (project-ht (ht-make-eq)))
-      (ht-set! data-ht (swa-project-id->symbol* project-id) project-ht)
+          (or (ht-ref (swa-env-data swa-env) (q client-static))
+            (let (a (ht-create-symbol)) (ht-set! (swa-env-data swa-env) (q client-static) a) a)))
+        (project-id (first config)) (bundles (tail config))
+        (project-symbol (swa-project-id->symbol* project-id))
+        (project-ht (or (ht-ref data-ht project-symbol) (ht-create-symbol))))
+      (ht-set! data-ht project-symbol project-ht)
       (each
         (l (a)
           (let ((bundle (first a)) (format-and-source (tail a)) (format-ht (ht-make-eq)))
@@ -338,7 +340,9 @@
                   (ht-set! format-ht format
                     (client-file swa-env format
                       (first bindings-and-sources) project-id
-                      (tail bindings-and-sources) (string-append "_" (symbol->string bundle))))))
+                      (tail bindings-and-sources)
+                      (string-append "_" (symbol->string project-symbol)
+                        "_" (symbol->string bundle))))))
               format-and-source)))
         bundles)))
 

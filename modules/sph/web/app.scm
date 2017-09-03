@@ -4,6 +4,12 @@
     match-path
     scgi-headers-get-content-length
     sph-web-app-description
+    swa-app-deinit
+    swa-app-depends
+    swa-app-init
+    swa-app-name
+    swa-app-record
+    swa-app-respond
     swa-config-bind
     swa-config-ref
     swa-create
@@ -89,7 +95,7 @@
 
   (define (swa-env? a) (and (vector? a) (= (vector-length a) (ht-size swa-env-record))))
 
-  (define-syntax-rule (call-app-init app-init swa-env)
+  (define (call-app-init app-init swa-env)
     ; update only if result is a vector of specific length.
     ; this is to make it less likely that swa-env is updated unintentionally
     (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
