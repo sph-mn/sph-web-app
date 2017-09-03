@@ -1,6 +1,12 @@
 (library (sph web app start)
   (export
     sph-web-app-start-description
+    swa-app-deinit
+    swa-app-depends
+    swa-app-init
+    swa-app-name
+    swa-app-record
+    swa-app-respond
     swa-config-get
     swa-create
     swa-env-config
@@ -52,12 +58,17 @@
   (define (swa-project-id->relative-path a)
     (string-append (string-join (map symbol->string a) "/") ".scm"))
 
-  (define* (swa-create respond #:optional init deinit)
-    "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
-     create a swa-app object that encapsulates the applications respond creation, initialise and deinitialise procedure"
-    (list respond (or init identity) (or deinit identity)))
+  (define* (swa-create name respond #:key init deinit depends)
+    "symbol/(symbol ...) procedure:{vector:request -> vector:response} _ ... -> vector:swa-app
+     #:init procedure:{vector:swa-env -> swa-env}
+     #:deinit procedure:{vector:swa-env -> swa-env}
+     #:depends (symbol/(symbol ...) ...)
+     create a swa-app object that encapsulates the applications main procedures, name and names of dependencies"
+    (record swa-app (any->list name)
+      respond (or init identity)
+      (or deinit identity) (or (and depends (map any->list (any->list depends))) null)))
 
-  (define (swa-link-root-files swa-root . paths)
+  (define (swa-link-root-files swa-root paths)
     "symlink non-generated files from the imports root-directories into the current root.
      currently requires that the filesystem supports symlinks. symlinks are also not deleted if the files are removed"
     (let (dest (string-append swa-root "root")) (ensure-directory-structure dest)
@@ -88,12 +99,12 @@
   (define (swa-config-get swa-root config)
     (if (string? config) (swa-config-get-file swa-root config) (or config (ht-create-symbol))))
 
-  (define (swa-paths-get projects load-paths)
+  (define (swa-paths-get projects load-paths c)
     "((symbol ...) ...) (string ...) -> list hashtable:{symbol:project-id-symbol -> string:swa-root}
      get project root directories from project/module names. the current project is the first element.
      also create a hashtable that maps project names to project root paths"
-    (let ((project-ht (ht-make-eq)))
-      (list
+    (let (project-ht (ht-create-symbol))
+      (apply c project-ht
         (map
           (l (id)
             (let*
@@ -108,23 +119,21 @@
                 (raise
                   (list (q project-not-found) "project not found in any module load path"
                     (q load-paths) load-paths (q projects) projects)))))
-          projects)
-        project-ht)))
+          projects))))
 
   (define-record swa-env root paths config data)
+  (define-record swa-app name respond init deinit depends)
   (define swa-env-record swa-env)
+  (define swa-app-record swa-app)
 
-  (define (swa-start projects config proc . arguments)
-    "(symbol ...)/((symbol ...) ...):module-names string/hashtable/false procedure any ... -> proc-result
+  (define (swa-start swa-app config proc . arguments)
+    "vector false/string/hashtable procedure:{env app any:arguments ...} any ... -> any
+     load configuration, project root directories and link static web root/ files into the parent project.
      create the swa-env object and call proc. the app is to be initialised in proc.
-     gets full paths for project names using current module load paths.
-     also links files from included root/ directories into the parent project"
-    (let
-      ( (projects (or (and (symbol? (first projects)) (list projects)) projects))
-        (load-paths (filter (l (a) (string-suffix? "modules" a)) %load-path)))
-      (list-bind (swa-paths-get projects load-paths) (paths project-ht)
-        (apply swa-link-root-files paths)
-        (apply proc
-          (let (root (first paths))
-            (record swa-env root project-ht (swa-config-get root config) (ht-create-symbol)))
-          arguments)))))
+     the modules of the parent and dependent projects must be in the module load path"
+    (let (load-paths (filter (l (a) (string-suffix? "modules" a)) %load-path))
+      (swa-paths-get (pair (swa-app-name swa-app) (swa-app-depends swa-app)) load-paths
+        (l (project-ht root . paths) (swa-link-root-files root paths)
+          (apply proc
+            (record swa-env root project-ht (swa-config-get root config) (ht-create-symbol)) swa-app
+            arguments))))))

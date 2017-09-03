@@ -15,7 +15,7 @@
     swa-env-record
     swa-env-root
     swa-env?
-    swa-server-http
+    swa-server-guile
     swa-server-internal
     swa-server-scgi
     swa-start
@@ -32,6 +32,7 @@
     (sph web app start)
     (web http)
     (web request)
+    (web response)
     (web server)
     (web uri)
     (only (guile) port-closed?))
@@ -69,10 +70,11 @@
 
   (define (local-socket-set-options address perm group)
     (if (string-prefix? "/" address)
-      ; set socket permissions and group if configured in config file
-      (if (integer? perm) (chmod address perm))
-      ; socket group setting can be tricky: in some circumstances or on some platforms it is not possible
-      (if group (chown address -1 (if (string? group) (group:gid (getgrnam group)) group)))))
+      (begin
+        ; set socket permissions and group if configured in config file
+        (if (integer? perm) (chmod address perm))
+        ; socket group setting can be tricky: in some circumstances or on some platforms it is not possible
+        (if group (chown address -1 (if (string? group) (group:gid (getgrnam group)) group))))))
 
   (define (call-with-socket listen-address listen-port perm group proc)
     (let (socket (server-create-bound-socket listen-address listen-port))
@@ -101,10 +103,24 @@
     (if socket-name (string-append (dirname scgi-default-address) "/" socket-name)
       scgi-default-address))
 
+  (define (swa-server-socket swa-env swa-app prepare-server-config c)
+    "vector vector procedure:{socket -> any} -> any
+     initialise a sph web application and a socket to use and call c with the socket.
+     when c returns, the application is deinitialised and the result is the result of c"
+    (let*
+      ( (swa-env (call-app-init (swa-app-init swa-app) swa-env))
+        (app-deinit (swa-app-deinit swa-app)) (config (swa-env-config swa-env))
+        (config (prepare-server-config (and config (ht-ref-q config server)))))
+      (ht-bind config (listen-address listen-port socket-permissions socket-group)
+        (call-with-socket listen-address listen-port
+          socket-permissions socket-group
+          (l (socket) (start-message listen-address listen-port)
+            (begin-first (c socket config) (app-deinit swa-env) (display "stopped listening.")))))))
+
   (define*
     (swa-server-scgi swa-env swa-app #:key (parse-query? #t)
       (exception-handler default-server-error-handler))
-    "vector procedure:{headers client app-respond} false/procedure:{key resume exception-arguments ...} boolean/(symbol ...) ->
+    "vector vector #:parse-query? boolean #:exception-handler procedure:{obj resume ->} ->
      starts a server listens for scgi requests and calls app-respond for each new request.
      calls app-init once on startup and app-deinit when the server stops listening.
      app-init can return a new or updated swa-env.
@@ -115,54 +131,57 @@
        server-thread-count integer
        server-exception-resume boolean
      this uses (sph scgi) which uses (sph server)"
-    (list-bind swa-app (app-respond app-init app-deinit)
-      (let*
-        ( (swa-env (call-app-init app-init swa-env)) (config (swa-env-config swa-env))
-          (config (ht-ref-q config server swa-scgi-default-config))
-          (http-respond (if parse-query? swa-http-respond-query swa-http-respond))
-          (socket-name (ht-ref-q config socket-name))
-          (listen-address
-            (or (ht-ref-q config listen-address) (swa-scgi-default-address socket-name))))
-        (ht-bind config (exception-resume listen-port thread-count socket-permissions socket-group)
-          (call-with-socket listen-address listen-port
-            socket-permissions socket-group
-            (l (socket) (start-message listen-address listen-port)
-              (scgi-handle-requests
-                (l (headers client) (http-respond swa-env app-respond headers client)) socket
-                thread-count #f #f (and exception-resume exception-handler))
-              (app-deinit swa-env) (display "stopped listening.")))))))
+    (swa-server-socket swa-env swa-app
+      (l (config)
+        (let (config (ht-copy* swa-scgi-default-config (l (a) (ht-merge! a config))))
+          (ht-set-q! config listen-address
+            (or (ht-ref-q config listen-address)
+              (swa-scgi-default-address (ht-ref-q config socket-name))))
+          config))
+      (l (socket config)
+        (let
+          ( (app-respond (swa-app-respond swa-app))
+            (http-respond (if parse-query? swa-http-respond-query swa-http-respond)))
+          (ht-bind config (exception-resume thread-count)
+            (scgi-handle-requests
+              (l (headers client) (http-respond swa-env app-respond headers client)) socket
+              thread-count #f #f (and exception-resume exception-handler)))))))
 
-  (define (swa-server-http swa-env swa-app)
-    "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/ (symbol ...) ->
-     starts a server to process http requests. no scgi proxy needed.
-     this uses guiles (web server) and has not been tested much yet"
-    (swa-config-bind swa-env (listen-address listen-port socket-permissions socket-group)
-      (let (listen-address (or listen-address "::1"))
-        (call-with-socket listen-address listen-port
-          socket-permissions socket-group
-          (list-bind swa-app (app-respond app-init app-deinit)
-            (l (socket)
-              (let (swa-env (call-app-init app-init swa-env))
-                (start-message listen-address listen-port)
-                (run-server
-                  (l (request request-body)
-                    (let*
-                      ( (headers
-                          (pair (pair "request_uri" (uri->string (request-uri request)))
-                            (map (l (a) (pair (symbol->string (first a)) (tail a)))
-                              (request-headers request))))
-                        (response
-                          (app-respond
-                            (record swa-http-request (alist-ref headers "request_uri")
-                              #f headers #f swa-env))))
-                      (values
-                        (read-headers
-                          (open-input-string
-                            (string-append
-                              (apply string-append (swa-http-response-headers response)) "\r\n")))
-                        (swa-http-response-body response))))
-                  (q http) (list #:socket socket))
-                (display "stopped listening.") (app-deinit swa-env))))))))
+  (define (swa-server-guile swa-env swa-app)
+    "vector vector ->
+     starts a server to process http requests directly, without an scgi proxy.
+     the swa-app will be responsible for the sending of any static files that might be requested"
+    (swa-server-socket swa-env swa-app
+      (l (config)
+        (let (config (ht-copy* swa-scgi-default-config (l (a) (ht-merge! a config))))
+          (ht-set-q! config listen-address (or (ht-ref-q config listen-address) "127.0.0.1")) config))
+      (l (socket config)
+        (let (app-respond (swa-app-respond swa-app))
+          (run-server
+            (l (request request-body)
+              (let*
+                ( (headers
+                    ; normalise headers to have string keys. uri->string just returned http:/
+                    (pairs (pair "request_uri" (uri-path (request-uri request)))
+                      (pair "request_method"
+                        (string-downcase (symbol->string (request-method request))))
+                      (map (l (a) (pair (symbol->string (first a)) (tail a)))
+                        (request-headers request))))
+                  (response
+                    (app-respond
+                      ; create a swa-http-request object
+                      (record swa-http-request (alist-ref headers "request_uri")
+                        #f headers #f swa-env)))
+                  (res-headers
+                    (read-headers
+                      (open-input-string
+                        (string-append (apply string-append (swa-http-response-headers response))
+                          "\r\n"))))
+                  (res-body (swa-http-response-body response)))
+                (values
+                  (build-response #:headers res-headers #:code (swa-http-response-status response))
+                  res-body)))
+            (q http) (list #:socket socket))))))
 
   (define (swa-server-internal swa-env swa-app proc)
     "vector list procedure:{procedure:{any ... -> any}} -> any:procedure-result
