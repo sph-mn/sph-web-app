@@ -92,6 +92,15 @@
     ; this is to make it less likely that swa-env is updated unintentionally
     (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
 
+  (define swa-scgi-default-config
+    (ht-create-symbol exception-resume #f
+      listen-address #f
+      listen-port #f socket-group #f socket-name #f socket-permissions 504 thread-count #f))
+
+  (define (swa-scgi-default-address socket-name)
+    (if socket-name (string-append (dirname scgi-default-address) "/" socket-name)
+      scgi-default-address))
+
   (define*
     (swa-server-scgi swa-env swa-app #:key (parse-query? #t)
       (exception-handler default-server-error-handler))
@@ -99,34 +108,29 @@
      starts a server listens for scgi requests and calls app-respond for each new request.
      calls app-init once on startup and app-deinit when the server stops listening.
      app-init can return a new or updated swa-env.
-     the no exception handler is installed when \"mode\" is development or \"single-threaded\" is true.
+     order:
+       app-init
+       start-server
+     optional swa configuration options:
+       server-thread-count integer
+       server-exception-resume boolean
      this uses (sph scgi) which uses (sph server)"
-    (swa-config-bind swa-env
-      (listen-address socket-name listen-port
-        socket-permissions socket-group mode single-threaded thread-count)
-      (let
-        ( (listen-address
-            (or listen-address
-              (if socket-name (string-append (dirname scgi-default-address) "/" socket-name)
-                scgi-default-address)))
-          (development (eq? mode (q development)))
-          (http-respond (if parse-query? swa-http-respond-query swa-http-respond)))
-        (call-with-socket listen-address listen-port
-          socket-permissions socket-group
-          (list-bind swa-app (app-respond app-init app-deinit)
-            (l (socket)
-              (let (swa-env (call-app-init app-init swa-env))
-                (start-message listen-address listen-port)
-                (if (or single-threaded development)
-                  ;single-threaded without extra exception handler
-                  (scgi-handle-requests
-                    (l (headers client) (http-respond swa-env app-respond headers client)) socket
-                    1 #f #f (if development #f exception-handler))
-                  ;possibly multi-threaded and all exceptions catched for continuous processing
-                  (scgi-handle-requests
-                    (l (headers client) (http-respond swa-env app-respond headers client)) socket
-                    thread-count #f #f exception-handler))
-                (app-deinit swa-env) (display "stopped listening."))))))))
+    (list-bind swa-app (app-respond app-init app-deinit)
+      (let*
+        ( (swa-env (call-app-init app-init swa-env)) (config (swa-env-config swa-env))
+          (config (ht-ref-q config server swa-scgi-default-config))
+          (http-respond (if parse-query? swa-http-respond-query swa-http-respond))
+          (socket-name (ht-ref-q config socket-name))
+          (listen-address
+            (or (ht-ref-q config listen-address) (swa-scgi-default-address socket-name))))
+        (ht-bind config (exception-resume listen-port thread-count socket-permissions socket-group)
+          (call-with-socket listen-address listen-port
+            socket-permissions socket-group
+            (l (socket) (start-message listen-address listen-port)
+              (scgi-handle-requests
+                (l (headers client) (http-respond swa-env app-respond headers client)) socket
+                thread-count #f #f (and exception-resume exception-handler))
+              (app-deinit swa-env) (display "stopped listening.")))))))
 
   (define (swa-server-http swa-env swa-app)
     "list string/rnrs-hashtable false/procedure:{key resume exception-arguments ...} boolean/ (symbol ...) ->
@@ -202,8 +206,7 @@
                 client path/headers c)))
           swa-env a))))
 
-  (define-syntax-rule
-    (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
+  (define (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
     (swa-start web-app-load-paths projects
       config-name swa-server-internal
       swa-app

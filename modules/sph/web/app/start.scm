@@ -21,8 +21,14 @@
     (sph lang config)
     (sph list)
     (sph record)
-    (only (guile) string-join file-exists?)
-    (only (sph process) shell-eval))
+    (only (guile)
+      string-join
+      file-exists?
+      dirname
+      string-suffix?
+      %load-path)
+    (only (sph process) shell-eval)
+    (only (sph string) string-equal?))
 
   (define sph-web-app-start-description
     "core web app initialisation
@@ -43,7 +49,8 @@
      this is done to be able to use eq? with the resulting identifier, list literals did not work"
     (string->symbol (string-join (map symbol->string a) "-")))
 
-  (define (swa-project-id->relative-path a) (string-join (map symbol->string a) "/"))
+  (define (swa-project-id->relative-path a)
+    (string-append (string-join (map symbol->string a) "/") ".scm"))
 
   (define* (swa-create respond #:optional init deinit)
     "procedure:{vector:request -> vector:response} false/procedure:{vector:swa-env ->} ... -> (false/procedure ...)
@@ -62,54 +69,62 @@
               (string-append other-root "root/*") " 2> /dev/null")))
         paths)))
 
-  (define (swa-config-get swa-root name)
-    "string string -> list
-     get a hashtable for the configuration file identified by \"name\""
-    (config-read-file (string-append swa-root "config/" name ".scm")))
+  (define (swa-config-get-file swa-root name)
+    "string string/hashtable/false -> list
+     get a hashtable for the configuration file identified by \"name\".
+     if a configuration file with the name default.scm exists, it is loaded first and
+     unless name is default, the configuration file identified by name overwrites values
+     in the default config.
+     for names other than \"default\" a configuration file must exist"
+    (let*
+      ( (default-path (string-append swa-root "config/default.scm"))
+        (config
+          (or (and (file-exists? default-path) (config-read-file default-path)) (ht-create-symbol)))
+        (name-config
+          (and (not (string-equal? "default" name))
+            (config-read-file (string-append swa-root "config/" name ".scm")))))
+      (if name-config (ht-tree-merge! config name-config)) config))
 
-  (define (swa-paths-get projects web-app-load-paths)
-    "((symbol ...) ...) -> hashtable:{symbol:project-id-symbol -> string:swa-root}
-     convert project names to full paths.
-     the current project is included"
-    (let (project-ht (ht-make-eq))
+  (define (swa-config-get swa-root config)
+    (if (string? config) (swa-config-get-file swa-root config) (or config (ht-create-symbol))))
+
+  (define (swa-paths-get projects load-paths)
+    "((symbol ...) ...) (string ...) -> list hashtable:{symbol:project-id-symbol -> string:swa-root}
+     get project root directories from project/module names. the current project is the first element.
+     also create a hashtable that maps project names to project root paths"
+    (let ((project-ht (ht-make-eq)))
       (list
         (map
           (l (id)
             (let*
               ( (relative-path (swa-project-id->relative-path id))
-                (found-path
+                (root
                   (any
                     (l (load-path)
                       (let (path (string-append load-path "/" relative-path))
-                        (and (file-exists? path) (ensure-trailing-slash path))))
-                    web-app-load-paths)))
-              (if found-path
-                (begin (ht-set! project-ht (swa-project-id->symbol id) found-path) found-path)
+                        (and (file-exists? path) (ensure-trailing-slash (dirname load-path)))))
+                    load-paths)))
+              (if root (begin (ht-set! project-ht (swa-project-id->symbol id) root) root)
                 (raise
-                  (list (q project-not-found) "project not found in any given web-app load-path"
-                    (q search-paths) web-app-load-paths (q projects) projects)))))
+                  (list (q project-not-found) "project not found in any module load path"
+                    (q load-paths) load-paths (q projects) projects)))))
           projects)
         project-ht)))
 
   (define-record swa-env root paths config data)
   (define swa-env-record swa-env)
 
-  (define (swa-start-p web-app-load-paths projects config proc . arguments)
-    "(string) list string/hashtable procedure any ... -> proc-result
-     get full paths for project names using the load path, create the swa-env and call proc.
-     web-app-load-paths is for locating client files and linking assets"
-    (list-bind (swa-paths-get projects (any->list web-app-load-paths)) (paths project-ht)
-      (apply swa-link-root-files paths)
-      (apply proc
-        (let (root (first paths))
-          (record swa-env root
-            project-ht
-            (if (string? config) (swa-config-get root config) (or config (ht-create-symbol)))
-            (ht-create-symbol)))
-        arguments)))
-
-  (define-syntax-rules swa-start
-    ( (web-app-load-paths ((project-id-part ...) ...) a ...)
-      (swa-start-p web-app-load-paths (q ((project-id-part ...) ...)) a ...))
-    ( (web-app-load-paths (project-id-part ...) a ...)
-      (swa-start web-app-load-paths ((project-id-part ...)) a ...))))
+  (define (swa-start projects config proc . arguments)
+    "(symbol ...)/((symbol ...) ...):module-names string/hashtable/false procedure any ... -> proc-result
+     create the swa-env object and call proc. the app is to be initialised in proc.
+     gets full paths for project names using current module load paths.
+     also links files from included root/ directories into the parent project"
+    (let
+      ( (projects (or (and (symbol? (first projects)) (list projects)) projects))
+        (load-paths (filter (l (a) (string-suffix? "modules" a)) %load-path)))
+      (list-bind (swa-paths-get projects load-paths) (paths project-ht)
+        (apply swa-link-root-files paths)
+        (apply proc
+          (let (root (first paths))
+            (record swa-env root project-ht (swa-config-get root config) (ht-create-symbol)))
+          arguments)))))
