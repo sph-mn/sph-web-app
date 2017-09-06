@@ -124,9 +124,9 @@
             (begin-first (c socket config) (app-deinit swa-env) (display "stopped listening.")))))))
 
   (define*
-    (swa-server-scgi swa-env swa-app #:key (parse-query? #t)
+    (swa-server-scgi swa-env swa-app #:key (parse-query #t)
       (exception-handler default-server-error-handler))
-    "vector vector #:parse-query? boolean #:exception-handler procedure:{obj resume ->} ->
+    "vector vector #:parse-query boolean #:exception-handler procedure:{obj resume ->} ->
      starts a server listens for scgi requests and calls app-respond for each new request.
      calls app-init once on startup and app-deinit when the server stops listening.
      app-init can return a new or updated swa-env.
@@ -147,7 +147,7 @@
       (l (socket config)
         (let
           ( (app-respond (swa-app-respond swa-app))
-            (http-respond (if parse-query? swa-http-respond-query swa-http-respond)))
+            (http-respond (if parse-query swa-http-respond-query swa-http-respond)))
           (ht-bind config (exception-resume thread-count)
             (scgi-handle-requests
               (l (headers client) (http-respond swa-env app-respond headers client)) socket
