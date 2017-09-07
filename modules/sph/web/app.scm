@@ -116,7 +116,8 @@
     (let*
       ( (swa-env (call-app-init (swa-app-init swa-app) swa-env))
         (app-deinit (swa-app-deinit swa-app)) (config (swa-env-config swa-env))
-        (config (prepare-server-config (and config (ht-ref-q config server)))))
+        (config
+          (prepare-server-config (or (and config (ht-ref-q config server)) (ht-create-symbol)))))
       (ht-bind config (listen-address listen-port socket-permissions socket-group)
         (call-with-socket listen-address listen-port
           socket-permissions socket-group
