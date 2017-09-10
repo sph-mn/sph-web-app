@@ -138,7 +138,7 @@
   (define (s-template-sxml->html source port options)
     "hashtable list port -> string
      compile sxml to xml from s-templates"
-    (display "<!doctype html>" port)
+    (put-string port "<!doctype html>")
     (template-fold
       (l (template-result . result) (sxml->xml template-result port) (newline port) result)
       (and options (ht-ref options (q template-bindings)))

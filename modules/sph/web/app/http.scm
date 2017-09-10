@@ -35,6 +35,7 @@
     swa-http-response-send-body
     swa-http-response-status)
   (import
+    (rnrs io ports)
     (sph base)
     (sph record)
     (sph web app client)
@@ -57,7 +58,6 @@
          (respond-type (q text) responder)
          (respond-type (q text) 200 headers responder)")
 
-  ;
   ;-- request
   ;
   (define-record swa-http-request path query headers client swa-env data)
@@ -145,10 +145,10 @@
       (swa-http-create-response 404 (list) "")))
 
   (define (swa-http-response-send-body a client)
-    (if (procedure? a) (begin (display "\n" client) (a client))
+    (if (procedure? a) (begin (put-char client #\newline) (a client))
       (if (string? a)
-        (begin (display (http-header-line "content-length" (string-octet-length a)) client)
-          (display "\n" client) (display a client)))))
+        (begin (put-string client (http-header-line "content-length" (string-octet-length a)))
+          (put-char client #\newline) (put-string client a)))))
 
   (define (swa-http-response-send response client)
     "vector:swa-http-response port ->
@@ -156,8 +156,8 @@
      swa-http-response-body can be a procedure, which will be applied with the client-port.
      this enables stream-like response-body sending"
     (http-write-status-line (swa-http-response-status response) client)
-    (each (l (line) (display line client)) (swa-http-response-headers response))
-    (swa-http-response-send-body (swa-http-response-body response) client))
+    (each (l (line) (put-string client line)) (swa-http-response-headers response))
+    (swa-http-response-send-body (swa-http-response-body response) client) (force-output client))
 
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
