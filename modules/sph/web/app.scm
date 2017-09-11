@@ -1,6 +1,5 @@
 (library (sph web app)
   (export
-    default-server-error-handler
     match-path
     scgi-headers-get-content-length
     sph-web-app-description

@@ -157,7 +157,7 @@
      this enables stream-like response-body sending"
     (http-write-status-line (swa-http-response-status response) client)
     (each (l (line) (put-string client line)) (swa-http-response-headers response))
-    (swa-http-response-send-body (swa-http-response-body response) client) (force-output client))
+    (swa-http-response-send-body (swa-http-response-body response) client))
 
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
