@@ -67,11 +67,13 @@
   ;-- server
 
   (define-syntax-rule (start-message address port)
-    (display
-      (string-append "listening on " address
-        (if (and (not (string-prefix? "/" address)) port) (string-append ":" (number->string port))
-          "")
-        "\n")))
+    (begin
+      (put-string (current-output-port)
+        (string-append "listening on " address
+          (if (and (not (string-prefix? "/" address)) port)
+            (string-append ":" (number->string port)) "")
+          "\n"))
+      (put-string (current-output-port) (string-append "exit with ctrl+c\n"))))
 
   (define (local-socket-set-options address perm group)
     (if (string-prefix? "/" address)
