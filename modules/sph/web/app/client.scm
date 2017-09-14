@@ -32,19 +32,28 @@
 
   (define sph-web-app-client-description
     "client-code processing. create target language files from templates and source files of varying formats with pre-processing.
-     # sources
-     the data structure given as sources depends on the input processor for the associated input format.
-     ## s-template formats
-     the sxml, plcss and sescript is configured to use (sph lang template) and its template-fold source format with template bindings.
-     the template-fold source format is configured to resolve relative paths relative to a web-app project.
-     the source path is constructed with this template: {swa-path}/client/{output-format}/{path-suffix}.
-     additionally, non-list pairs are supported as arguments:
-     example: (symbol/(symbol...):project-id . relative-path)
-     this is for selecting files from other web-app projects.
-     # syntax
-     client-static-config-create :: symbol/(symbol ...) (output-format symbol:bundle-id/(list:template-bindings any:source ...) ...) ...
-       creates a configuration object for client-static-compile.
-       all arguments are literals and output-format configurations are quasiquoted, so unquote can be used")
+     sources
+       the data structure given as sources depends on the input processor for the associated input format.
+     s-template formats
+       the default sxml, plcss and sescript input processor is configured to use (sph lang template) and its template-fold source format with template bindings.
+       the template-fold source format is resolves relative paths relative to a web-app project root.
+       the source path is constructed with this template: {swa-path}/client/{output-format}/{requested-path}
+       filename extensions are optional.
+       non-list pairs are supported as arguments
+         example: (symbol/(symbol...):project-id . relative-path)
+         this is for selecting files from other web-app projects
+     syntax
+       client-static-config-create :: symbol/(symbol ...) (output-format-id symbol:bundle-id/(list:template-bindings any:source ...) ...) ...
+         creates a configuration object for client-static-compile.
+         all arguments are literals and output-format configurations are quasiquoted, so unquote can be used
+         example:
+         (define client-static-config
+           (client-static-config-create project-name
+             (bundle-name
+               css (#f \"testfile\")
+               js ((unquote alist-q testvariable \"testvalue\") \"testsjsfile\"))
+             (another-bundle
+               css (#f \"otherfile\"))))")
 
   ; -- path preparation
 

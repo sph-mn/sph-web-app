@@ -98,7 +98,7 @@
 
   (define swa-scgi-default-config
     (ht-create-symbol listen-address #f
-      listen-port #f socket-group #f socket-name #f socket-permissions 504))
+      listen-port 6500 socket-group #f socket-name #f socket-permissions 504))
 
   (define (swa-scgi-default-address socket-name)
     (let (scgi-default (scgi-default-address))
@@ -160,7 +160,8 @@
       swa-app
       (l (config)
         (let (config (ht-copy* swa-scgi-default-config (l (a) (ht-merge! a config))))
-          (ht-set-q! config listen-address (or (ht-ref-q config listen-address) "127.0.0.1")) config))
+          (ht-set-q! config listen-address (or (ht-ref-q config listen-address) "127.0.0.1"))
+          (ht-set-q! config port (or (ht-ref-q config port) 6500)) config))
       (l (socket config)
         (let (app-respond (swa-app-respond swa-app))
           (run-server

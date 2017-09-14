@@ -1,6 +1,8 @@
 #!/usr/bin/guile
 !#
 
-(add-to-load-path (dirname (getcwd)))
-(import (sph web app) (project-minimal main))
-(swa-start (project-minimal) #f swa-server-scgi swa-app)
+; the modules directory should be in GUILE_LOAD_PATH, then the following line is not necessary
+(add-to-load-path (string-append (getcwd) "/modules"))
+
+(import (sph web app) (project-name))
+(swa-start swa-app "default" swa-server-scgi)

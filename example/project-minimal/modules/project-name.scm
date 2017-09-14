@@ -1,4 +1,4 @@
-(library (project-minimal main)
+(library (project-name)
   (export
     swa-app)
   (import
@@ -7,4 +7,5 @@
     (sph web app http))
 
   (define (app-respond request) (respond "running"))
-  (define swa-app (swa-create app-respond)))
+
+  (define swa-app (swa-create (quote project-name) app-respond)))

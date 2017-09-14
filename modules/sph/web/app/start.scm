@@ -110,11 +110,13 @@
             (let*
               ( (relative-path (swa-project-id->relative-path id))
                 (root
-                  (any
-                    (l (load-path)
-                      (let (path (string-append load-path "/" relative-path))
-                        (and (file-exists? path) (ensure-trailing-slash (dirname load-path)))))
-                    load-paths)))
+                  (or
+                    (any
+                      (l (load-path)
+                        (let (path (string-append load-path "/" relative-path))
+                          (and (file-exists? path) (ensure-trailing-slash (dirname load-path)))))
+                      load-paths)
+                    (getcwd))))
               (if root (begin (ht-set! project-ht (swa-project-id->symbol id) root) root)
                 (raise
                   (list (q project-not-found) "project not found in any module load path"
