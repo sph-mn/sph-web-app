@@ -2,7 +2,7 @@ see [sph.mn](http://sph.mn/c/view/mu) for full documentation.
 
 # minimal example
 
-```
+```scheme
 (import (sph web app) (sph web app http))
 
 (define (app-respond request) (respond "test"))
@@ -12,9 +12,9 @@ see [sph.mn](http://sph.mn/c/view/mu) for full documentation.
 (swa-start swa-app #f swa-server-guile)
 ```
 
-put the above in a file "example.scm" then
+put the above in a file ``example.scm`` then
 
-```
+```shell
 guile example.scm
 ```
 
