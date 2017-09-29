@@ -153,7 +153,8 @@
           (ht-bind config (parallelism exception-key)
             (scgi-handle-requests
               (l (headers client) (http-respond swa-env app-respond headers client)) #:socket
-              socket #:parallelism parallelism #:exception-key exception-key #:server-listen server-listen))))))
+              socket #:parallelism
+              parallelism #:exception-key exception-key #:server-listen server-listen))))))
 
   (define (swa-server-guile swa-env swa-app)
     "vector vector ->

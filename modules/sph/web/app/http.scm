@@ -53,7 +53,7 @@
          :: symbol:type-key procedure -> swa-http-response
          :: symbol:type-key integer:http-status-code (string ...):headers procedure -> swa-http-response
        description
-         respond with a type available in swa-http-key->mime-type. json, html, text, style and script are available by default.
+         respond with a type available in swa-http-key->mime-type. json, html, text, css and js are available by default.
        examples
          (respond-type (q text) responder)
          (respond-type (q text) 200 headers responder)")
@@ -109,13 +109,12 @@
   (define-record swa-http-response status headers body)
 
   (define-as swa-http-key->mime-type ht-create-symbol
-    json "application/json"
-    html "text/html" text "text/plain" style "test/css" script "text/javascript")
+    json "application/json" html "text/html" text "text/plain" css "test/css" js "text/javascript")
 
   (define* (swa-http-header-content-type key #:optional (encoding "utf-8"))
     "symbol:content-type-identifier -> string:header-line
      results in a header-line for setting the response content-type.
-     key has to exist in swa-http-key->mime-type. by default json, html, text, style and script are available."
+     key has to exist in swa-http-key->mime-type. by default json, html, text, css and js are available."
     (http-header-line "content-type"
       (string-append (ht-ref swa-http-key->mime-type key) ";charset=" encoding)))
 
@@ -127,7 +126,7 @@
   (define (swa-http-response-content-type-add a key)
     "vector:swa-http-response content-type-identifier -> vector:swa-http-response
      adds a header-line for setting the content-type to the response and results in the extended response.
-     key has to exist in swa-http-key->mime-type. by default json, html, text, style and script are available."
+     key has to exist in swa-http-key->mime-type. by default json, html, text, css and js are available."
     (swa-http-response-headers-add! a (swa-http-header-content-type key)))
 
   (define (swa-http-create-response* a)
