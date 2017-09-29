@@ -34,6 +34,7 @@
     "client-code processing. create target language files from templates and source files of varying formats with pre-processing.
      sources
        the data structure given as sources depends on the input processor for the associated input format.
+       see client-ac-config, client-input-id->suffixes-ht and (sph filesystem asset-compiler) for how to add new asset processors
      s-template formats
        the default sxml, plcss and sescript input processor is configured to use (sph lang template) and its template-fold source format with template bindings.
        the template-fold source format is resolves relative paths relative to a web-app project root.
@@ -56,6 +57,11 @@
                css (#f \"otherfile\"))))")
 
   ; -- path preparation
+  (define client-output-path "assets/")
+  (define-syntax-rule (client-output-directory swa-root) (string-append swa-root "root/"))
+
+  (define-syntax-rule (client-input-id->suffixes format)
+    (ht-ref client-input-suffixes-ht format (list)))
 
   (define (swa-paths-search swa-paths relative-path)
     "(string ...) string -> false/(load-path . relative-path)"
@@ -65,14 +71,9 @@
           (and (file-exists? path) (pair load-path relative-path))))
       swa-paths))
 
-  (define-syntax-rule (client-output-directory swa-root) (string-append swa-root "root/"))
-  (define client-output-path "assets/")
-
-  (define-as client-format->suffixes-ht ht-create-symbol
+  (define-as client-input-suffixes-ht ht-create-symbol
+    ; for the optional suffix in source filenames
     js (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
-
-  (define-syntax-rule (client-format->suffixes format)
-    (ht-ref client-format->suffixes-ht format (list)))
 
   (define (client-delete-compiled-files swa-root)
     "deletes all filles in the client data output directory with an underscore as prefix,
@@ -109,6 +110,7 @@
   (define (prepare-sources default-project swa-paths sources output-format)
     "(string ...) list symbol [integer] -> any
      normalise the (sph web app client) sources format to the (sph lang template) template-fold sources format.
+     allow usage of filenames without filename extension.
      first level:
      * string: relative paths or full path
      * list: recurse once
@@ -118,7 +120,7 @@
     (if (list? sources)
       (let
         ( (default-root (ht-ref swa-paths (swa-project-id->symbol* default-project)))
-          (format-suffixes (client-format->suffixes output-format)))
+          (format-suffixes (client-input-id->suffixes output-format)))
         (let loop ((sources sources) (depth 0))
           (every-map
             (l (a)
@@ -172,11 +174,6 @@
       (l (template-result . result) (plcss->css template-result port) (newline port) result)
       (and options (ht-ref-q options template-bindings))
       (or (and options (ht-ref-q options template-environment)) default-env) source))
-
-  (define (string-and-suffix-proc suffix) (l (a) (and (string? a) (string-suffix? suffix a))))
-
-  (define (string-and-suffix-or-true-proc suffix)
-    (l (a) (if (string? a) (string-suffix? suffix a) #t)))
 
   (define (development-mode? options) (eq? (q development) (ht-ref-q options mode)))
 
@@ -241,19 +238,17 @@
           (l (process-input out-port options)
             ((if (development-mode? options) format compress) process-input out-port options))))))
 
-  (define (ac-input-copy source out options) (file->port source out) (newline out))
+  (define (match-template-source-f suffix) (l (a) (if (string? a) (string-suffix? suffix a) #t)))
 
-  (define-as client-ac-config ht-create-symbol
-    ; the main configuration for the asset pipeline
-    html
-    (list html-output-processor (vector (q html) (string-and-suffix-proc ".html") ac-input-copy)
-      (vector (q sxml) (string-and-suffix-or-true-proc ".sxml") s-template-sxml->html))
-    css
-    (list css-output-processor (vector (q css) (string-and-suffix-proc ".css") ac-input-copy)
-      (vector (q plcss) (string-and-suffix-or-true-proc ".plcss") s-template-plcss->css))
-    js
-    (list js-output-processor (vector (q js) (string-and-suffix-proc ".js") ac-input-copy)
-      (vector (q sjs) (string-and-suffix-or-true-proc ".sjs") s-template-sescript->js)))
+  (define-as client-ac-config ac-config
+    ; the main configuration for the supported formats of the asset pipeline.
+    ; see (sph filesystem asset-compiler)
+    ( (html #t html-output-processor) (html #t #f)
+      (sxml (match-template-source-f ".sxml") s-template-sxml->html))
+    ( (css #t css-output-processor) (css #t #f)
+      (plcss (match-template-source-f ".plcss") s-template-plcss->css))
+    ( (js #t js-output-processor) (js #t #f)
+      (sjs (match-template-source-f ".sjs") s-template-sescript->js)))
 
   ;-- main exports
 

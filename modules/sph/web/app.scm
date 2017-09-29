@@ -101,7 +101,7 @@
   (define swa-scgi-default-config
     (ht-create-symbol listen-address #f
       listen-port 6500
-      socket-group #f socket-name #f socket-permissions 504 exception-keys #t parallelism #f))
+      socket-group #f socket-name #f socket-permissions 504 exception-key #t parallelism #f))
 
   (define (swa-scgi-default-address socket-name)
     (let (scgi-default (scgi-default-address))
@@ -150,10 +150,10 @@
         (let
           ( (app-respond (swa-app-respond swa-app))
             (http-respond (if parse-query swa-http-respond-query swa-http-respond)))
-          (ht-bind config (parallelism exception-keys)
+          (ht-bind config (parallelism exception-key)
             (scgi-handle-requests
               (l (headers client) (http-respond swa-env app-respond headers client)) #:socket
-              socket #:parallelism parallelism #:exception-keys exception-keys #:server-listen server-listen))))))
+              socket #:parallelism parallelism #:exception-key exception-key #:server-listen server-listen))))))
 
   (define (swa-server-guile swa-env swa-app)
     "vector vector ->
