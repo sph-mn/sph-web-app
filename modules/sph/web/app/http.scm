@@ -116,7 +116,7 @@
      results in a header-line for setting the response content-type.
      key has to exist in swa-http-key->mime-type. by default json, html, text, css and js are available."
     (http-header-line "content-type"
-      (string-append (ht-ref swa-http-key->mime-type key) ";charset=" encoding)))
+      (string-append (if (string? key) key (ht-ref swa-http-key->mime-type key)) ";charset=" encoding)))
 
   (define (swa-http-response-headers-add! a . header-lines)
     "vector:swa-http-response string:header-line ... -> vector:swa-http-response
