@@ -3,7 +3,7 @@
 
 ; depends on "cp" and "sed"
 ;
-(import (sph base) (sph cli))
+(import (sph common) (sph cli))
 (define path-project-example "/usr/share/sph/web/app/project-example")
 (define path-project-minimal "/usr/share/sph/web/app/project-minimal")
 

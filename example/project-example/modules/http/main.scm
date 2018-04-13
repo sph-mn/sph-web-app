@@ -2,7 +2,7 @@
   (export
     main-action)
   (import
-    (sph base)
+    (sph common)
     (sph web app)
     (sph web app http))
 

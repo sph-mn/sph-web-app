@@ -36,7 +36,7 @@
     swa-http-response-status)
   (import
     (rnrs io ports)
-    (sph base)
+    (sph common)
     (sph record)
     (sph web app client)
     (sph web http))

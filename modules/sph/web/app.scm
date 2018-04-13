@@ -28,7 +28,7 @@
     swa-test-http-start)
   (import
     (ice-9 match)
-    (sph base)
+    (sph common)
     (sph log)
     (sph record)
     (sph scgi)

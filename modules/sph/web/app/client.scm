@@ -18,7 +18,7 @@
   (import
     (ice-9 threads)
     (rnrs eval)
-    (sph base)
+    (sph common)
     (sph filesystem asset-compiler)
     (sph lang plcss)
     (sph lang sescript)
