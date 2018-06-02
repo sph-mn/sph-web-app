@@ -129,7 +129,8 @@
                   (if (string-prefix? "/" a) a
                     (path-relative->path-full default-root a output-format format-suffixes)))
                 ((list? a) (if (= 0 depth) (loop a (+ 1 depth)) a))
-                ((pair? a) (path-pair->path-full swa-paths a output-format format-suffixes)) (else a)))
+                ((pair? a) (path-pair->path-full swa-paths a output-format format-suffixes))
+                (else a)))
             sources)))
       sources))
 
@@ -224,17 +225,21 @@
           ( (format
               (l (process-input out options)
                 (execute-with-pipes
-                  (l (child-in child-out)
+                  (l (child-in child-out child-err)
                     (begin-thread (process-input child-in) (close-port child-in))
+                    (begin-thread (port-copy-all child-err (current-error-port))
+                      (close-port child-err))
                     (port-copy-all child-out out))
-                  path-uglifyjs (list "--beautify") #t #t)))
+                  path-uglifyjs (list "--beautify") #t #t #t)))
             (compress
               (l (process-input out options)
                 (execute-with-pipes
-                  (l (child-in child-out)
+                  (l (child-in child-out child-err)
                     (begin-thread (process-input child-in) (close-port child-in))
+                    (begin-thread (port-copy-all child-err (current-error-port))
+                      (close-port child-err))
                     (port-copy-all child-out out))
-                  path-uglifyjs (list "--compress" "--mangle") #t #t))))
+                  path-uglifyjs (list "--compress" "--mangle") #t #t #t))))
           (l (process-input out-port options)
             ((if (development-mode? options) format compress) process-input out-port options))))))
 
@@ -326,7 +331,7 @@
     "vector list -> unspecified
      pre-compile the static client files to be served and save result file paths in swa-data.
      creates a nested hashtable structure in swa-data with the following hierarchy:
-     (client-static project-id-symbol bundle-id output-format compiled-source-path)"
+     client-static > project-id-symbol > bundle-id > output-format > compiled-source-path"
     (let*
       ( (data-ht
           (or (ht-ref (swa-env-data swa-env) (q client-static))
