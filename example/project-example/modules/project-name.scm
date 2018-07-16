@@ -33,7 +33,7 @@
           ; the (div) is wrapped in another list because on this nesting level it would
           ; otherwise be appended to lib/layout
           (list "lib/layout" (list (q (div "root path response"))))))
-      (("main" id) (main-example request id)) (_ (respond "default route"))))
+      (("main" id) (main-action request id)) (_ (respond "default route"))))
 
   ; app-init and app-deinit are optional
 

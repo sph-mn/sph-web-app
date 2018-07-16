@@ -1,7 +1,9 @@
 (define-test-module (test module sph web app client)
   (import
-    (sph common)
+    (sph io)
+    (sph list)
     (sph record)
+    (sph hashtable)
     (sph web app client)
     (sph web app start))
 

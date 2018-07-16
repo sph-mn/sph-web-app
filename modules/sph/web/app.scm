@@ -28,9 +28,13 @@
     swa-test-http-start)
   (import
     (ice-9 match)
-    (sph common)
+    (sph)
+    (sph alist)
+    (sph hashtable)
+    (sph io)
     (sph log)
     (sph record)
+    (only (sph filesystem) path->list)
     (sph scgi)
     (sph server)
     (sph web app http)
@@ -40,7 +44,9 @@
     (web response)
     (web server)
     (web uri)
-    (only (guile) port-closed?))
+    (only (guile) port-closed?)
+    (only (sph list) list-bind)
+    (only (sph one) begin-first))
 
   (define sph-web-app-description
     "main module that exports swa-start, swa-server-scgi and various helpers.
@@ -83,9 +89,9 @@
         ; socket group setting can be tricky: in some circumstances or on some platforms it is not possible
         (if group (chown address -1 (if (string? group) (group:gid (getgrnam group)) group))))))
 
-  (define (call-with-socket server-socket listen-address listen-port perm group proc)
+  (define (call-with-socket server-socket listen-address listen-port perm group c)
     (let (socket (server-socket listen-address #:port listen-port))
-      (local-socket-set-options listen-address perm group) (proc socket)))
+      (local-socket-set-options listen-address perm group) (c socket)))
 
   (define (scgi-headers-get-content-length h)
     ; get the request-body-size from headers
@@ -109,7 +115,7 @@
 
   (define (swa-server-socket server-socket swa-env swa-app prepare-server-config c)
     "vector vector procedure:{socket -> any} -> any
-     initialise a sph web application and a socket to use and call c with the socket.
+     initialise a sph web application and a socket to use, then call c with the socket.
      when c returns, the application is deinitialised and the result is the result of c"
     (let*
       ( (swa-env (call-app-init (swa-app-init swa-app) swa-env))
@@ -127,7 +133,7 @@
     (swa-server-scgi swa-env swa-app #:key (parse-query #t) (server-socket server-socket)
       (server-listen server-listen))
     "vector vector #:parse-query boolean ->
-     starts a server listens for scgi requests and calls app-respond for each new request.
+     starts a server, listens for scgi requests and calls app-respond for each new request.
      calls app-init once on startup and app-deinit when the server stops listening.
      app-init can return a new or updated swa-env.
      processing order:
@@ -135,9 +141,9 @@
        start-server
      optional swa configuration options:
        parallelism integer
-     server-listen and server-socket can be specified to use alternative server implementations,
+     server-listen and server-socket can be specified to use alternative scgi server implementations,
      for example (sph server fibers).
-     this uses (sph scgi) which uses (sph server)"
+     the default is (sph scgi) which uses (sph server)"
     (swa-server-socket server-socket swa-env
       swa-app
       (l (config)
@@ -192,7 +198,10 @@
                 (values
                   (build-response #:headers res-headers #:code (swa-http-response-status response))
                   res-body)))
-            (q http) (list #:socket socket))))))
+            (q http) (list #:socket socket))
+          ; returning the result of run-server leads to a "Zero values returned to single-valued continuation" error.
+          ; return unspecified instead
+          (if #f #t)))))
 
   (define (swa-server-internal swa-env swa-app proc)
     "vector list procedure:{procedure:{any ... -> any}} -> any:procedure-result

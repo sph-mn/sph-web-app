@@ -36,10 +36,17 @@
     swa-http-response-status)
   (import
     (rnrs io ports)
-    (sph common)
+    (sph)
+    (sph alist)
+    (sph hashtable)
     (sph record)
+    (sph string)
     (sph web app client)
-    (sph web http))
+    (sph web http)
+    (only (guile)
+      false-if-exception
+      string-downcase
+      string-split))
 
   (define sph-web-app-http-description
     "http request/response helpers.
@@ -116,7 +123,8 @@
      results in a header-line for setting the response content-type.
      key has to exist in swa-http-key->mime-type. by default json, html, text, css and js are available."
     (http-header-line "content-type"
-      (string-append (if (string? key) key (ht-ref swa-http-key->mime-type key)) ";charset=" encoding)))
+      (string-append (if (string? key) key (ht-ref swa-http-key->mime-type key)) ";charset="
+        encoding)))
 
   (define (swa-http-response-headers-add! a . header-lines)
     "vector:swa-http-response string:header-line ... -> vector:swa-http-response
