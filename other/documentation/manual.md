@@ -504,7 +504,7 @@ WantedBy=multi-user.target
 ```
 
 # extending the asset pipeline
-see (sph web app client)[http://sph.mn/c/view/7u] and (sph filesystem asset-compiler)[http://sph.mn/c/view/6q].
+see [sph web app client](http://sph.mn/c/view/7u) and [sph filesystem asset-compiler](http://sph.mn/c/view/6q).
 extend the hash-table ``client-ac-config``
 ```
 (import  (sph filesystem asset-compiler) (sph web app client) (sph common))
