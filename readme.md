@@ -2,7 +2,7 @@ small but scheme-typically powerful web application framework
 
 * initialises web applications, starts a server and provides optional modules for some features commonly needed for web projects
 * similar perhaps to express.js
-* status: should work. maintained
+* status: should work. maintained as of 2018-09
 
 # minimal example
 
