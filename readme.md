@@ -55,7 +55,7 @@ http://127.0.0.1:6500
 
 # documentation
 
-[other/documentation/manual.md](web-app manual)
+[web-app manual](other/documentation/manual.md)
 
 ## other learning resources
 an example project can be created with
