@@ -1,5 +1,9 @@
 small but scheme-typically powerful web application framework
 
+* initialises web applications, starts a server and provides optional modules for some features commonly needed for web projects
+* similar perhaps to express.js
+* status: should work. maintained
+
 # minimal example
 
 ```scheme
@@ -31,11 +35,6 @@ then take a browser and go to
 http://127.0.0.1:6500
 ```
 
-# general
-* initialises web applications, starts a server and provides optional modules for some commonly needed features
-* similar perhaps to express.js
-* status: should work. maintained
-
 # features
 * starts a server, passes request objects to handler procedures and transmits response objects
 * protocol agnostic core: socket -> web-app -> socket
@@ -47,15 +46,16 @@ http://127.0.0.1:6500
 * the scgi servers are for use with a proxy like nginx for https, automatic chunked-encoding, fast file transfers, keep-alive, websockets, load-balancing, caching, general http robustness and more
 * optional modules
   * http requests/responses
-  * templating with s-expression versions of [xml (sxml)]("https://en.wikipedia.org/wiki/SXML"), [css (plcss)](http://sph.mn/c/browse/link-view/sph-lang-plcss/library/documentation) and [javascript (sescript)](https://github.com/sph-mn/sescript)
+  * templating with s-expression versions of [xml (sxml)]("https://en.wikipedia.org/wiki/SXML"), css [(plcss)](http://sph.mn/c/browse/link-view/sph-lang-plcss/library/documentation) and javascript [(sescript)](https://github.com/sph-mn/sescript)
   * asset processing: transcompilation, bundling, minification, compression, formatting, etc
-* fast, because it tries do to the minimum
+* fast
   * plain vectors as records for request and response objects
   * response objects can have procedures that send data while it is generated
   * requests have little overhead as little data has to be prepared
 
 # documentation
-[other/documentation/manual.md](wep-app manual)
+
+[other/documentation/manual.md](web-app manual)
 
 ## other learning resources
 an example project can be created with

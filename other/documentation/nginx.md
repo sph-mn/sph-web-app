@@ -44,6 +44,6 @@ scgi_param https $https;
 * events, worker_processes: nginx fails to start if these options are not set
 * mime.types: for serving assets with the right content-type depending on filename extension. you can create and include a custom file with fewer mime types for optimisation
 * listen: depends on what the hostname resolves to: if it is 127.0.0.1 instead of the ipv6 address ::1, then use 127.0.0.1:80 instead. *:80 did not work for me
-* root: "/srv/http/project-name/root;" contains the path to the root directory in the web-app project. there can also be a directory /srv/http/project-name where the root directory is symlinked to
+* root: the path to the root directory in the web-app project. the root directory is preferably symlinked to ``/srv/http/project-name``
 * location /assets/: this configures nginx to not pass requests with paths that begin with /assets/ to the scgi application
-* scgi_pass: the 1000 in "unix:/tmp/1000/project-name;" is the user id of the user running the web-app application, adjust it accordingly. "echo $UID"
+* scgi_pass: the 1000 in ``unix:/tmp/1000/project-name;`` contains the user id of the user that will be running the web-app application, adjust it accordingly. ``echo $UID``
