@@ -11,7 +11,7 @@
 
   (define swa-env
     (record swa-env-record "/tmp/"
-      (ht-create-symbol (q test) "/tmp/") (ht-create-symbol mode (q production)) (ht-create-symbol)))
+      (ht-create-symbol-q test "/tmp/") (ht-create-symbol-q mode (q production)) (ht-create-symbol)))
 
   (define-test (client-html)
     (assert-equal "<!doctype html><div>test</div>\n"

@@ -115,7 +115,7 @@
 
   (define-record swa-http-response status headers body)
 
-  (define-as swa-http-key->mime-type ht-create-symbol
+  (define-as swa-http-key->mime-type ht-create-symbol-q
     json "application/json" html "text/html" text "text/plain" css "test/css" js "text/javascript")
 
   (define* (swa-http-header-content-type key #:optional (encoding "utf-8"))

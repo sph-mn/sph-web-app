@@ -105,7 +105,7 @@
     (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
 
   (define swa-scgi-default-config
-    (ht-create-symbol listen-address #f
+    (ht-create-symbol-q listen-address #f
       listen-port 6500
       socket-group #f socket-name #f socket-permissions 504 exception-key #t parallelism #f))
 
