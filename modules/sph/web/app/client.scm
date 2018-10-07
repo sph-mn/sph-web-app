@@ -78,7 +78,7 @@
           (and (file-exists? path) (pair load-path relative-path))))
       swa-paths))
 
-  (define-as client-input-suffixes-ht ht-create-symbol
+  (define-as client-input-suffixes-ht ht-create-symbol-q
     ; for the optional suffix in source filenames
     js (list ".sjs" ".js") css (list ".plcss" ".css") html (list ".sxml" ".html"))
 
@@ -273,7 +273,7 @@
       ((sources (prepare-sources default-project-id (swa-env-paths swa-env) sources output-format)))
       (ac-compile client-ac-config output-format
         sources port-output
-        (ht-create-symbol mode (ht-ref (swa-env-config swa-env) (q mode) (q production))
+        (ht-create-symbol-q mode (ht-ref (swa-env-config swa-env) (q mode) (q production))
           template-bindings (bindings-add-swa-env swa-env bindings)))))
 
   (define*
@@ -291,7 +291,7 @@
             sources (string-append output-directory client-output-path)
             #:when when
             #:processor-options
-            (ht-create-symbol mode mode template-bindings (bindings-add-swa-env swa-env bindings))
+            (ht-create-symbol-q mode mode template-bindings (bindings-add-swa-env swa-env bindings))
             #:dest-name file-name)))
       (string-append "/" (string-drop-prefix output-directory path))))
 
