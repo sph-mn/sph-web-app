@@ -46,7 +46,7 @@
     (web uri)
     (only (guile) port-closed?)
     (only (sph list) list-bind)
-    (only (sph one) begin-first))
+    (only (sph other) begin-first))
 
   (define sph-web-app-description
     "main module that exports swa-start, swa-server-scgi and various helpers.

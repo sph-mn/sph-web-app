@@ -29,7 +29,7 @@
     (sph lang template)
     (sph list)
     (sph log)
-    (sph one)
+    (sph other)
     (sph process create)
     (sph record)
     (sph string)
@@ -39,11 +39,15 @@
 
   (define sph-web-app-client-description
     "client-code processing. create target language files from templates and source files of varying formats with pre-processing.
+     features
+       compile possibly preprocessed and concatenated files on demand
+       included formats are css, html, js and plcss, sxml, plcss with template variables support
+       compile bundles of possibly preprocessed files and get the public path by bundle id (client-static)
      sources
        the data structure given as sources depends on the input processor for the associated input format.
        see client-ac-config, client-input-id->suffixes-ht and (sph filesystem asset-compiler) for how to add new asset processors
      s-template formats
-       the default sxml, plcss and sescript input processor is configured to use (sph lang template) and its template-fold source format with template bindings.
+       the default sxml, plcss and sescript input processors are configured to use (sph lang template) s-expression templates and its template-fold source format with template bindings.
        the template-fold source format is resolves relative paths relative to a web-app project root.
        the source path is constructed with this template: {swa-path}/client/{output-format}/{requested-path}
        filename extensions are optional.
@@ -145,6 +149,7 @@
   ;
   (define default-env (apply environment (list-q (sph))))
   (define (search-env-path* a) (first-or-false (search-env-path (list a))))
+  (define (development-mode? options) (eq? (q development) (ht-ref-q options mode)))
 
   (define (execute-files->port sources port executable . arguments)
     "(string ...) port string string ... ->
@@ -182,8 +187,6 @@
       (l (template-result . result) (plcss->css template-result port) (newline port) result)
       (and options (ht-ref-q options template-bindings))
       (or (and options (ht-ref-q options template-environment)) default-env) source))
-
-  (define (development-mode? options) (eq? (q development) (ht-ref-q options mode)))
 
   (define html-output-processor
     ; disabled, because it can change how things are rendered
@@ -317,7 +320,7 @@
   (define (client-file-html swa-env bindings project . sources)
     (client-file swa-env (q html) bindings project sources))
 
-  ;-- pre-compilation with configuration object
+  ;-- client-static: pre-compilation using a configuration object
   ;
   (define (swa-project-id->symbol* a) (if (symbol? a) a (swa-project-id->symbol a)))
 
