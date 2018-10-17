@@ -507,7 +507,7 @@ WantedBy=multi-user.target
 see [sph web app client](http://sph.mn/c/view/7u) and [sph filesystem asset-compiler](http://sph.mn/c/view/6q).
 extend the hash-table ``client-ac-config``
 ```
-(import (sph filesystem asset-compiler) (sph web app client) (sph filesystem) (sph hashtable) (sph io) (sph list) (sph number) (sph other) (sph process) (sph string) (sph vector) (sph))
+(import (sph filesystem asset-compiler) (sph web app client) (rnrs hashtables))
 
 (hashtable-set! client-ac-config (quote tar)
   (list
