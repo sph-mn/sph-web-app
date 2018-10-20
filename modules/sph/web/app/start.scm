@@ -83,17 +83,18 @@
   (define (swa-config-get-file swa-root name)
     "string string/hashtable/false -> list
      get a hashtable for the configuration file identified by \"name\".
-     if a configuration file with the name default.scm exists, it is loaded first and
+     if a configuration file with the name default exists, it is loaded first and
      unless name is default, the configuration file identified by name overwrites values
      in the default config.
      for names other than \"default\" a configuration file must exist"
     (let*
-      ( (default-path (string-append swa-root "config/default.scm"))
+      ( (default-path (string-append swa-root "config/default"))
         (config
-          (or (and (file-exists? default-path) (config-read-file default-path)) (ht-create-symbol)))
+          (or (and (file-exists? default-path) (config-read-file default-path #:hashtable #t))
+            (ht-create-symbol)))
         (name-config
           (and (not (string-equal? "default" name))
-            (config-read-file (string-append swa-root "config/" name ".scm")))))
+            (config-read-file (string-append swa-root "config/" name) #:hashtable #t))))
       (if name-config (ht-tree-merge! config name-config)) config))
 
   (define (swa-config-get swa-root config)
@@ -102,7 +103,8 @@
   (define (swa-paths-get projects load-paths c)
     "((symbol ...) ...) (string ...) -> list hashtable:{symbol:project-id-symbol -> string:swa-root}
      get project root directories from project/module names. the current project is the first element.
-     also create a hashtable that maps project names to project root paths"
+     also create a hashtable that maps project names to project root paths.
+     project paths are expected to be found relative to the project module, \"{project-root}/modules/project-name ...\""
     (let (project-ht (ht-create-symbol))
       (apply c project-ht
         (map
