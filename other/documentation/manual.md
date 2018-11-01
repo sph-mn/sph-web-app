@@ -224,33 +224,37 @@ the first argument to template procedures is a procedure that returns the values
 the second argument is the content received from the previous template value for composition, or false if there is none
 
 # configuration files
+web-app itself only has few configuration options, any other keys and values are user controlled and custom. use them in the configuration file and they will be available in the application
+
 ## where
-configuration files are stored under ``config/`` with the filename suffix ``.scm``
+configuration files are stored under ``config/``
 
 ## syntax
-* the content of configuration files is interpreted like elements of a quasiquoted list with key and value specified alternatingly. full scheme syntax is supported. indendation is not relevant (= scheme syntax)
-* lists and sub-lists create key-value hierarchies. when lists are prefixed with "..", actual lists are created in the config object instead of nested hashtables
-* web-app itself only has few configuration options, all other keys and values are user controlled and custom. use them in the configuration file and they will be available in the application
+* all elements are scheme expressions
+* key and value are specified alternatingly
+* keys are symbols
+* indent of two spaces is used for nesting
+* all scheme syntax including comments work
 
-example ``config/default.scm``
+example ``config/default``
 ```
 default-title "project-name"
-server (
+server
   socket-name "project-name"
   socket-permissions #o770
-  socket-group "http")
-types (.. 2 4 5)
+  socket-group "http"
+types (2 4 5)
 ```
 
 ## derivation
-other configuration files derive from "default.scm". in other configuration files, any key from default that is not used takes its default value from default.scm.
-for example, if there is a file "config/development.scm" that contains only
+other configuration files derive from "default". in other configuration files, any key from default that is not used takes its default value from default.
+for example, if there is a file "config/development" that contains only:
 
 ```
 mode development
 ```
 
-and swa-start is instructed to use this configuration with the name development, then the configuration will contain all values from default.scm, overwritten with all values from development.scm.
+and swa-start is instructed to use this configuration with the name development, then the configuration will contain all values from default, overwritten with all values from development.
 this can be used to create multiple configuration files with minor differences for different environments, for example for different server hosts
 
 ## access
@@ -292,8 +296,8 @@ nevertheless, there is a recommended directory structure for web-app. in the fol
     {output-format-extension} ...
       {name}.{input-format-extension}
   config
-    default.scm
-    {config-name}.scm
+    default
+    {config-name}
   exe
     start
   root
