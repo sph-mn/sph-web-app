@@ -65,8 +65,6 @@
          (respond-type (q text) responder)
          (respond-type (q text) 200 headers responder)")
 
-  ;-- request
-  ;
   (define-record swa-http-request path query headers client swa-env data)
 
   (define (swa-http-request-cookie request) "vector -> alist:parsed-cookie"
@@ -107,9 +105,6 @@
             (if (null? arguments) arguments (http-uri-query-string->alist (first arguments) #\;))))
         (string-split url-path #\?))))
 
-  ;-- response
-  ;
-
   (define-syntax-rules swa-http-create-response ((a) (swa-http-create-response* a))
     ((status body) (vector status (list) body)) ((status headers body) (vector status headers body)))
 
@@ -146,9 +141,11 @@
      boolean-false: 404
      else: http 200, empty response-body"
     (if a
-      (if (procedure? a) (swa-http-create-response 200 (list) a)
-        (if (integer? a) (swa-http-create-response a (list) "")
-          (if (vector? a) a (swa-http-create-response 200 (list) (if (string? a) a "")))))
+      (cond
+        ((procedure? a) (swa-http-create-response 200 (list) a))
+        ((integer? a) (swa-http-create-response a (list) ""))
+        ((vector? a) a)
+        (else (swa-http-create-response 200 (list) (if (string? a) a ""))))
       (swa-http-create-response 404 (list) "")))
 
   (define (swa-http-response-send-body a client)

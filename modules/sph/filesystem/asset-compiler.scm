@@ -2,21 +2,18 @@
   (export
     ac-compile
     ac-compile->file
-    ac-config
     ac-config-input
-    ac-config-input-p
+    ac-config-new
     ac-config-output
-    ac-config-output-p
-    ac-config-p
     ac-config-valid?
-    ac-destination
+    ac-file-name
+    ac-input-copy
     ac-input-id
     ac-input-matcher
     ac-input-processor
-    ac-input-record
+    ac-output-copy
     ac-output-id
     ac-output-processor
-    ac-output-record
     ac-output-suffix
     ac-source-files-updated?
     sph-filesystem-asset-compiler-description)
@@ -27,93 +24,53 @@
     (sph hashtable)
     (sph io)
     (sph list)
-    (sph record))
+    (sph vector))
 
   (define sph-filesystem-asset-compiler-description
-    "configuration format and helpers to process and concatenate files from multiple sources.
-     for example to compile from many files in different preprocessor formats into one target format file.
-     features
-       configuration for all processors
-       process file always, only if source file is newer or only if destination file doesnt exist
-       match files by suffix or custom procedure
-       option to automatically create destination filenames
-     data structures
-       config: hashtable:{symbol:output-format -> (config-output config-input ...)}
-       config-output: #(symbol:id string:suffix false/procedure:processor-output)
-       config-input: #(symbol:name source-match? false/procedure:processor-input)
-       config-format: (config-output config-input ...)
-       source-match? :: boolean/procedure:{any:source -> boolean}
-       processor-input :: source-element port:output any:processor-options ->
-       processor-output :: procedure:input->port port:output-port any:processor-options ->
-       sources: (any:processor-dependent ...)
-     syntax
-       ac-config :: (out-id suffix out-proc) (in-id matcher in-proc) ... -> hashtable
-       ac-config-input :: id matcher processor -> vector
-       ac-config-output :: id suffix processor -> vector
-     example config
-       (define my-ac-config
-         (ac-config
-           ( (html \".htm\" (l (process-input out-port options) (process-input out-port)))
-             (html #t (l (source out-port options) (file->port source out-port)))
-             (sxml #t s-template-sxml->html))
-           ( (js #t js-output-processor)
-             (js #t ac-input-copy)
-             (sjs #t s-template-sescript->js))))")
+    "preprocess files.
+     # features
+     * configuration object for source file matchers and processors
+     * optionally ignore files if already existing and unchanged
+     * by default automatically create destination file names from source file names
+     # notes
+     * ac-input converts data into the output format and ac-output finalises it and writes it to the target file
+     * ac-config is a hashtable:{symbol:output-format -> (ac-output ac-input ...)}
+     # example
+     (define client-ac-config
+       (ac-config-new
+         (list
+           (list (q html)
+             (ac-config-output (q html) \".html\" ac-output-copy)
+             (ac-config-input (q html) \".html\" ac-input-copy)
+             (ac-config-input (q shtml) \".shtml\" template-sxml->html)
+             (ac-config-input (q shtml-data) (const #t) template-sxml->html))
+           (list (q css)
+             (ac-config-output (q css) \".css\" css-output-processor)
+             (ac-config-input (q css) \".css\" ac-input-copy)
+             (ac-config-input (q plcss) \".plcss\" template-plcss->css)
+             (ac-config-input (q plcss-data) (const #t) template-plcss->css)))))
+     (define (input-processor source port options)
+       (sxml->xml template-result port)
+       (newline port))")
 
-  (define-syntax-rule (ac-config ((out-id suffix out-proc) (in-id matcher in-proc) ...) ...)
-    (ac-config-p
-      (list
-        (list (q out-id) (ac-config-output out-id suffix out-proc)
-          (ac-config-input in-id matcher in-proc) ...)
-        ...)))
+  (define (ac-config-output id suffix processor) "symbol string procedure -> vector"
+    (vector (q ac-output) id suffix processor))
 
-  (define-syntax-rule (ac-config-output id suffix processor)
-    (ac-config-output-p (q id) suffix processor))
-
-  (define-syntax-rule (ac-config-input id matcher processor)
-    (ac-config-input-p (q id) matcher processor))
-
-  (define-record ac-input id matcher processor)
-  (define-record ac-output id suffix processor)
-  (define ac-input-record ac-input)
-  (define ac-output-record ac-output)
-  (define (id->extension a) (string-append "." (symbol->string a)))
-  (define (match-suffix-f suffix) (l (a) (and (string? a) (string-suffix? suffix a))))
-
-  (define (ac-config-p config-source)
-    "list:((id config-output config-input ...) ...) -> hashtable
-     create an ac-config from a list with the following format"
-    (ht-from-alist config-source))
-
-  (define (ac-config-output-p id suffix processor)
-    "symbol string/procedure/boolean procedure -> vector
-     create a config-output object.
-     if processor is false, a default processor that just copies is used.
-     suffix
-       #t: use the id as a filename extension separated with a dot
-       else: no filename extension"
-    (vector id
-      (cond
-        ((and (boolean? suffix) suffix) (id->extension id))
-        ((string? suffix) suffix)
-        (else ""))
-      processor))
-
-  (define (ac-config-input-p id matcher processor)
-    "symbol procedure/boolean procedure/false
-     create a config-input object.
-     if processor is false, a default processor that interprets source elements as
-     filesystem paths and reads them is used.
-     matcher
-       procedure: match a source element
-       #t: match the id as a filename extension separated with a dot
-           for source elements which are strings
-       else: never match"
-    (vector id
+  (define (ac-config-input id matcher processor) "symbol procedure/string procedure -> vector"
+    (vector (q ac-input) id
       (if (procedure? matcher) matcher
-        (if (boolean? matcher) (if matcher (match-suffix-f (id->extension id)) (const #f))
-          (const #f)))
+        (if (string? matcher) (l (a) (and (string? a) (string-suffix? matcher a))) (const #f)))
       processor))
+
+  (define ac-input-id (vector-accessor 1))
+  (define ac-input-matcher (vector-accessor 2))
+  (define ac-input-processor (vector-accessor 3))
+  (define ac-output-id (vector-accessor 1))
+  (define ac-output-suffix (vector-accessor 2))
+  (define ac-output-processor (vector-accessor 3))
+
+  (define (ac-config-new config-source)
+    "list:((id config-output config-input ...) ...) -> hashtable" (ht-from-alist config-source))
 
   (define (ac-input-copy source port options)
     "a default processor-input that interprets source as a file name if it is a string.
@@ -121,44 +78,34 @@
      if source is not a string it does nothing and returns false"
     (and (string? source) (begin (file->port source port) (newline port))))
 
-  (define (ac-output-copy get-input port options)
-    "a default processor-output that copies input to output port" (get-input port))
+  (define (ac-output-copy write-input port options)
+    "a default processor-output that copies input to output port" (write-input port))
 
-  (define ac-compile
-    (let*
-      ( (sources->get-and-argument
-          (l (sources config-input-list)
-            "list vector -> ((procedure:processor . source) ...)
-            find a matching processor/reader for each source or raise an exception if no processor matches"
-            (map
-              (l (a)
-                (or
-                  (any
-                    (l (b)
-                      (and ((ac-input-matcher b) a)
-                        (pair (or (ac-input-processor b) ac-input-copy) a)))
-                    config-input-list)
-                  (raise (list (q no-matching-input-processor) a))))
-              sources)))
-        (sources->input-processor
-          (l (sources config-input options)
-            "list list any -> procedure
-             create a procedure that processes all source elements with a matching config-input.
-             note: with some output formats you may want to emit a newline or similar after each source in the input processor,
-             to prevent for example code being appended to a line comment from the last line of the previous file"
-            (let (get-and-argument (sources->get-and-argument sources config-input))
-              (l (out-port) (each (l (a) ((first a) (tail a) out-port options)) get-and-argument))))))
-      (l* (config output-format sources port #:optional processor-options)
-        "hashtable symbol list port [any] -> false/unspecified
-        \"processor-options\" is an optional value passed to input and output processors as the last argument"
-        (and-let* ((config-format (ht-ref config output-format)))
-          ( (or (ac-output-processor (first config-format)) ac-output-copy)
-            (sources->input-processor sources (tail config-format) processor-options) port
-            processor-options)))))
+  (define (ac-sources->input-processor sources config-input options)
+    "list list any -> procedure
+     map each source to one processor and return a procedure that calls all processors with the
+     associated source and writes to a port"
+    (let
+      (processor-and-source
+        (map
+          (l (a)
+            (or
+              (any (l (b) (and ((ac-input-matcher b) a) (pair (ac-input-processor b) a)))
+                config-input)
+              (raise (list (q no-matching-input-processor) a))))
+          sources))
+      (l (out-port) "call each input processor with associated source, output port and options"
+        (each (l (a) ((first a) (tail a) out-port options)) processor-and-source))))
 
-  ;-- filesystem
+  (define* (ac-compile config output-format sources port #:optional processor-options)
+    "hashtable symbol list port [any] -> false/unspecified
+     \"processor-options\" is an optional custom value passed to input and output processors as the last argument"
+    (and-let* ((config-format (ht-ref config output-format)))
+      ( (ac-output-processor (first config-format))
+        (ac-sources->input-processor sources (tail config-format) processor-options) port
+        processor-options)))
 
-  (define* (ac-destination path-directory format sources #:optional name suffix)
+  (define* (ac-file-name path-directory format sources #:optional name (suffix ""))
     "string symbol string list -> string
      create a string for an output path relative to \"path-directory\".
      format:
@@ -180,24 +127,23 @@
 
   (define*
     (ac-compile->file config output-format sources dest-directory #:key processor-options when
-      dest-name)
+      file-name)
     "hashtable symbol list string _ ... -> string:path-destination
+     compile a set of sources and get the filesystem path to the compiled file.
      #:processor-options: any/alist
      #:when takes a symbol:
        new: update only if destination does not exist
        newer: update if destination does not exist or any source file is newer
        always: always compile, overwriting any existing destination file
-     #:dest-name sets the destination file name to use instead of an automatically generated one"
+     #:file-name sets the destination file name to use instead of an automatically generated one"
     (let*
       ( (config-format (ht-ref config output-format)) (config-output (first config-format))
-        (sources-flat (flatten sources))
         (path-destination
-          (ac-destination dest-directory output-format
-            sources-flat dest-name (ac-output-suffix config-output))))
+          (ac-file-name dest-directory output-format
+            sources file-name (ac-output-suffix config-output))))
       (if
-        (or (eq? (q always) when) (not (every string? sources-flat))
-          (not (file-exists? path-destination))
-          (ac-source-files-updated? path-destination sources-flat))
+        (or (eq? (q always) when) (not (every string? sources))
+          (not (file-exists? path-destination)) (ac-source-files-updated? path-destination sources))
         (and (ensure-directory-structure (dirname path-destination))
           (call-with-output-file path-destination
             (l (port) (ac-compile config output-format sources port processor-options)))
