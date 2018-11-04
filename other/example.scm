@@ -2,6 +2,6 @@
 
 (define (app-respond request) (respond "test"))
 
-(define swa-app (swa-create (quote project-name) app-respond))
+(define swa-app (swa-app-new app-respond))
 
-(swa-start swa-app #f swa-server-guile)
+(swa-start swa-app (getcwd) #f swa-server-guile)

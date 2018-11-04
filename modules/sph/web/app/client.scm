@@ -12,6 +12,7 @@
   (import
     (ice-9 threads)
     (rnrs eval)
+    (rnrs exceptions)
     (sph)
     (sph alist)
     (sph filesystem)
@@ -25,13 +26,14 @@
     (sph other)
     (sph process create)
     (sph string)
-    (sph web app start)
+    (sph web app base)
     (sph web shtml)
     (sxml simple)
     (only (guile) call-with-input-file))
 
   (define sph-web-app-client-description
     "client-code processing.
+     depends on sescript.
      # features
      * read files from a swa-root relative path
      * write files to a swa-root relative path
@@ -74,12 +76,12 @@
       (data
         (if (string? source) (file->list read source)
           (if (port? source) (port->list read source) source)))
-      (l (bindings) "alist -> any"
-        (eval
-          (quasiquote
-            ( (lambda (unquote (map first bindings)) (quasiquote (unquote data)))
-              (unquote (map tail bindings))))
-          env))))
+      (if data
+        (l (bindings) "alist -> any"
+          ( (eval (qq (lambda (unquote (map first bindings)) (unquote (list (q quasiquote) data))))
+              env)
+            (map tail bindings)))
+        (throw (q template-not-found) source))))
 
   (define (client-delete-compiled-files swa-root)
     "deletes all files in the client data output directory with an underscore as prefix,
@@ -107,7 +109,7 @@
     "any list symbol [integer] -> any
      allow to source file paths without filename suffix"
     (let (format-suffixes (ht-ref client-format-suffixes format null))
-      (map
+      (filter-map
         (l (a)
           (if (string? a) (client-source-full-path swa-root a output-format format-suffixes) a))
         sources)))
@@ -204,11 +206,13 @@
     (and-let* ((sources (prepare-sources (swa-env-root swa-env) sources output-format)))
       (ac-compile client-ac-config output-format
         sources port-output
-        (ht-create-symbol-q mode (ht-ref (swa-env-config swa-env) (q mode) (q production))
-          template-bindings (bindings-add-swa-env swa-env bindings)))))
+        (ht-create-symbol-q template-environment
+          (ht-ref (swa-env-config swa-env) (q template-environment) template-default-env) mode
+          (ht-ref (swa-env-config swa-env) (q mode) (q production)) template-bindings
+          (bindings-add-swa-env swa-env bindings)))))
 
   (define* (client-file swa-env output-format bindings sources #:optional file-name)
-    "symbol false/list:alist:template-variables list -> string:url-path
+    "vector symbol false/list:alist:template-variables list -> string:url-path
      destination-path template: {swa-root}/root/assets/{output-format}/_{sources-dependent-name}"
     (and-let*
       ( (output-directory (client-output-directory (swa-env-root swa-env)))
@@ -221,17 +225,16 @@
             sources (string-append output-directory client-output-path)
             #:when when
             #:processor-options
-            (ht-create-symbol-q mode mode template-bindings (bindings-add-swa-env swa-env bindings))
+            (ht-create-symbol-q template-environment
+              (ht-ref (swa-env-config swa-env) (q template-environment) template-default-env) mode
+              mode template-bindings (bindings-add-swa-env swa-env bindings))
             #:file-name file-name)))
       (string-append "/" (string-drop-prefix output-directory path))))
 
   (define-syntax-rule (client-static-config-create (bundle-id format/sources ...) ...)
     (client-static-config-create-p (qq ((bundle-id format/sources ...) ...))))
 
-  (define (client-static-config-create-p data)
-    "symbol list -> list
-     example
-           "
+  (define (client-static-config-create-p data) "list -> list"
     (map
       (l (a) "(bundle-id format/sources ...) -> unspecified"
         (pair (first a) (list->alist (tail a))))

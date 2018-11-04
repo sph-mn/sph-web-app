@@ -3,10 +3,8 @@
     nginx-respond-file
     nginx-respond-file-download
     respond
-    respond-html
     respond-type
     sph-web-app-http-description
-    swa-http-client-static
     swa-http-create-response
     swa-http-header-content-type
     swa-http-parse-query
@@ -186,16 +184,6 @@
     ((type-key body) (respond 200 (list (swa-http-header-content-type type-key)) body))
     ( (type-key status header-lines body)
       (respond status (pair (swa-http-header-content-type type-key) header-lines) body)))
-
-  (define* (respond-html request bindings project source #:optional (headers (list)))
-    "vector list list:client-html-source [list] -> vector:swa-http-response
-     respond with status code 200 and content type text/html"
-    (respond 200 (pair "content-type:text/html\r\n" headers)
-      (let (swa-env (swa-http-request-swa-env request))
-        (l (client) (client-html swa-env client bindings project source)))))
-
-  (define-syntax-rule (swa-http-client-static request a ...)
-    (client-static (swa-http-request-swa-env request) a ...))
 
   (define* (nginx-respond-file path #:optional mime-type)
     "string [string] -> swa-http-response

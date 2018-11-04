@@ -5,15 +5,14 @@ small but scheme-typically powerful web application framework
 * status: should work. maintained as of 2018-09
 
 # minimal example
-
 ```scheme
 (import (sph web app) (sph web app http))
 
 (define (app-respond request) (respond "test"))
 
-(define swa-app (swa-create (quote project-name) app-respond))
+(define swa-app (swa-app-new app-respond))
 
-(swa-start swa-app #f swa-server-guile)
+(swa-start swa-app (getcwd) #f swa-server-guile)
 ```
 
 put the above in a file ``example.scm`` then
@@ -39,7 +38,6 @@ http://127.0.0.1:6500
 * starts a server, passes request objects to handler procedures and transmits response objects
 * protocol agnostic core: socket -> web-app -> socket
 * pluggable server (thread-pool scgi, fibers scgi, direct http, none for testing ...)
-* composable projects. projects can derive functionality and assets from other projects
 * derivative environment configuration files in an s-expression format
 * mostly functional, avoids side-effects. no "set!" used
 * basic routing on any request property and url pattern matching
@@ -71,7 +69,7 @@ sourcecode of live projects
 * [guile](https://www.gnu.org/software/guile/guile.html)
 * [sph-lib](https://github.com/sph-mn/sph-lib)
 * optional
-  * [sescript](https://github.com/sph-mn/sescript)
+  * [sescript](https://github.com/sph-mn/sescript) (for (sph web app client))
 
 # installation
 * install all dependencies if there are some

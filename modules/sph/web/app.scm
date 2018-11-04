@@ -4,10 +4,8 @@
     scgi-headers-get-content-length
     sph-web-app-description
     swa-app-deinit
-    swa-app-depends
     swa-app-init
-    swa-app-name
-    swa-app-record
+    swa-app-new
     swa-app-respond
     swa-config-bind
     swa-config-ref
@@ -16,8 +14,7 @@
     swa-env-config-set!
     swa-env-data
     swa-env-data-set!
-    swa-env-paths
-    swa-env-record
+    swa-env-new
     swa-env-root
     swa-env?
     swa-server-guile
@@ -34,17 +31,17 @@
     (sph io)
     (sph log)
     (sph record)
-    (only (sph filesystem) path->list)
     (sph scgi)
     (sph server)
+    (sph web app base)
     (sph web app http)
-    (sph web app start)
     (web http)
     (web request)
     (web response)
     (web server)
     (web uri)
     (only (guile) port-closed?)
+    (only (sph filesystem) path->list)
     (only (sph list) list-bind)
     (only (sph other) begin-first))
 
@@ -70,8 +67,6 @@
   (define-syntax-rule (swa-config-bind swa-env (key ...) body ...)
     (ht-bind (swa-env-config swa-env) (key ...) body ...))
 
-  ;-- server
-
   (define-syntax-rule (start-message address port)
     (begin
       (put-string (current-output-port)
@@ -93,15 +88,12 @@
     (let (socket (server-socket listen-address #:port listen-port))
       (local-socket-set-options listen-address perm group) (c socket)))
 
-  (define (scgi-headers-get-content-length h)
-    ; get the request-body-size from headers
+  (define (scgi-headers-get-content-length h) "get the request-body-size from headers"
     (alist-ref h "CONTENT_LENGTH"))
 
-  (define (swa-env? a) (and (vector? a) (= (vector-length a) (ht-size swa-env-record))))
-
   (define (call-app-init app-init swa-env)
-    ; update only if result is a vector of specific length.
-    ; this is to make it less likely that swa-env is updated unintentionally
+    "update only if result is a vector of specific length,
+     to make it less likely that swa-env is updated unintentionally"
     (let (a (app-init swa-env)) (if (swa-env? a) a swa-env)))
 
   (define swa-scgi-default-config
@@ -245,10 +237,9 @@
                 client path/headers c)))
           swa-env a))))
 
-  (define (swa-test-http-start web-app-load-paths projects config-name swa-app test-settings c)
-    (swa-start web-app-load-paths projects
-      config-name swa-server-internal
-      swa-app
+  (define (swa-test-http-start root config-name swa-app test-settings c)
+    (swa-start root config-name
+      swa-server-internal swa-app
       (l (swa-env app-respond)
         (let
           ( (procedure-wrap (alist-ref test-settings (q procedure-wrap)))

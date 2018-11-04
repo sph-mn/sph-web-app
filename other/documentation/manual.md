@@ -26,9 +26,9 @@ to create a new project in the current directory. replace project-name with the 
 * "modules/project-name.scm" should be a scheme module and export at least one binding: ``swa-app`` - a swa-app object (a vector)
 * this module is to be the main application entry point for responding to requests as well as what is needed for application initialisation and deinitialisation
 * an application can be completely defined in one module. for bigger applications it usually makes sense to split the code into multiple modules
-* to create a swa-app object use ``swa-create``
+* to create a swa-app object use ``swa-app-new``
 ```
-(swa-create name respond #:key init deinit depends)
+(swa-app-new respond #:key init deinit)
 ```
 
 example ``modules/project-name.scm``
@@ -44,7 +44,7 @@ example ``modules/project-name.scm``
   (define (app-respond request)
     (respond "test"))
 
-  (define swa-app (swa-create (quote project-name) app-respond)))
+  (define swa-app (swa-app-new app-respond)))
 ```
 
 ``(sph web app http)`` contains the ``respond`` binding for http response objects
@@ -359,7 +359,7 @@ create a ``client-static`` config object and ``client-static-config-create`` def
 (import (sph web app client))
 
 (define client-static-config
-  (client-static-config-create project-name
+  (client-static-config-create
     (default
       js (#f "main")
       css ((example-variable "testvalue" another-variable 3) "main" "otherfile"))
@@ -375,32 +375,27 @@ in app-init, call
 
 where needed, get the public, server-root relative, path to one or multiple compiled bundle files with client-static
 ```
-(client-static swa-env (quote project-name) (quote css) (quote (bundle-name other-bundle-name)))
+(client-static swa-env (quote css) (quote (bundle-name other-bundle-name)))
 ```
 
 ## dynamic files
 ``(sph web app client)`` has exports to pre-process files/templates and sets of those on demand
 
 ### client-file
-client-file, client-file-html, client-file-css and client-file-js write the pre-processed result to a file with an automatically generated file name with an underscore prefix (unless set otherwise using the file-name parameter)
+client-file writes the eventually processed result to a file with an automatically generated file name with an underscore prefix (unless set otherwise using the file-name parameter)
 ```
-(client-file swa-env format-name template-variables default-project-id sources #:optional file-name)
-(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) (quote myproject) (list "relative-path"))
+(client-file swa-env output-format template-variables sources #:optional file-name)
+(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) (list "relative-path"))
 ```
 
-### client
+### client-port
 client-html, client-css and client-js write the processed content to port directly
 ```
-(client-html swa-env port bindings project . sources)
+(client-port swa-env output-format port-output bindings sources)
 ```
 
-### other projects
-to reference files from projects of which the current root project derives from (see swa-create ``#:depends``), pairs can be used for file names
-
-example
-```
-(client-file-js swa-env #f (quote myproject) (quote ((otherproject . "relative-path"))))
-```
+## changing file processors
+modify the `client-ac-config` hashtable, which maps `output-format-symbol` to `(ac-output ac-input ...)`, see also `modules/sph/filesystem/asset-compiler.scm` and `client.scm`
 
 # servers
 ## included
@@ -465,8 +460,7 @@ server (
 ```
 
 # deriving from projects
-use the ``#:depends`` parameter of swa-create.
-all ``modules/`` directories of projects should be in ``GUILE_LOAD_PATH`` or similar, then import application modules as scheme libraries where needed
+import application modules as scheme libraries where needed
 
 for example in modules/sph-mn.scm
 ```
@@ -480,8 +474,8 @@ for example in modules/sph-mn.scm
   (respond "i'm derived"))
 
 (define swa-app
-  (swa-create (quote sph-mn) app-respond
-    #:init app-init #:deinit (swa-app-deinit cms-swa-app) #:depends (quote sph-cms)))
+  (swa-app-new app-respond
+    #:init app-init #:deinit (swa-app-deinit cms-swa-app)))
 ```
 
 this imports the swa-app object from (sph-cms) with the identifier prefixed with cms- to avoid a name conflict in the current module, then uses the swa-app object accessor swa-app-init to retrieve the other app-init procedure and calls it with the swa-env.
