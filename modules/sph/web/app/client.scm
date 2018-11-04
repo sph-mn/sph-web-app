@@ -49,10 +49,10 @@
      (client-static-config-create
        (default
          css (((template-variable-name . (unquote 123))) \"sph\" \"sph-cms\")
-         js (#f \"foreign/crel\" \"foreign/underscore\"))
+         js (\"foreign/crel\" \"foreign/underscore\"))
        (c-view
-         css (#f \"content/view\")
-         js (#f \"content/view\")))")
+         css (\"content/view\")
+         js (\"content/view\")))")
 
   (define client-output-path "assets/")
   (define (client-output-directory swa-root) (string-append swa-root "root/"))
@@ -76,9 +76,11 @@
       (data
         (if (string? source) (file->list read source)
           (if (port? source) (port->list read source) source)))
+      (display-line (string-append "compiling template \"" source "\""))
       (if data
         (l (bindings) "alist -> any"
-          ( (eval (qq (lambda (unquote (map first bindings)) (unquote (list (q quasiquote) data))))
+          (apply
+            (eval (qq (lambda (unquote (map first bindings)) (unquote (list (q quasiquote) data))))
               env)
             (map tail bindings)))
         (throw (q template-not-found) source))))
@@ -108,7 +110,7 @@
   (define (prepare-sources swa-root sources output-format)
     "any list symbol [integer] -> any
      allow to source file paths without filename suffix"
-    (let (format-suffixes (ht-ref client-format-suffixes format null))
+    (let (format-suffixes (ht-ref client-format-suffixes output-format null))
       (filter-map
         (l (a)
           (if (string? a) (client-source-full-path swa-root a output-format format-suffixes) a))
@@ -249,23 +251,32 @@
       ( (data-ht
           (or (ht-ref (swa-env-data swa-env) (q client-static))
             (let (a (ht-create-symbol)) (ht-set! (swa-env-data swa-env) (q client-static) a) a)))
-        (bundles (tail config)))
+        (bundles config))
       (each
         (l (a)
           (let ((bundle (first a)) (format-and-source (tail a)) (format-ht (ht-make-eq)))
             (ht-set! data-ht bundle format-ht)
             (each
               (l (a)
-                (let ((format (first a)) (bindings-and-sources (tail a)))
+                (let*
+                  ( (format (first a)) (bindings-and-sources (tail a))
+                    (first-is-bindings (list? (first bindings-and-sources)))
+                    (bindings (and first-is-bindings (first bindings-and-sources)))
+                    (sources
+                      (if first-is-bindings (tail bindings-and-sources) bindings-and-sources)))
                   (ht-set! format-ht format
                     (client-file swa-env format
-                      (first bindings-and-sources) (tail bindings-and-sources)
-                      (string-append "_" (symbol->string bundle))))))
+                      bindings sources (string-append "_" (symbol->string bundle))))))
               format-and-source)))
         bundles)))
 
   (define (client-static swa-env format bundle-ids)
     "vector symbol symbol symbol -> false/string
      get compiled source paths for bundle-ids"
-    (let (bundle-ht (ht-ref (swa-env-data swa-env) (q client-static)))
-      (map (l (a) (ht-ref (ht-ref bundle-ht a) format)) bundle-ids))))
+    (let (bundles-ht (ht-ref (swa-env-data swa-env) (q client-static)))
+      (map
+        (l (a)
+          (let (bundle-ht (ht-ref bundles-ht a))
+            (if bundle-ht (ht-ref bundle-ht format)
+              (raise (list (q client-static-bundle-not-found) a)))))
+        bundle-ids))))
