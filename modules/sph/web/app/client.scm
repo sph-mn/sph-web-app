@@ -42,7 +42,7 @@
      * optionally ignore files if already existing and unchanged
      * template variables for s-expression based input formats, accessible with unquote
      * compile bundles of possibly preprocessed files and get the public path by bundle id (client-static)
-     * source paths are constructed corresponding to this template: {swa-root}/client/{output-format}/{requested-path}
+     * source paths are constructed corresponding to this template by default: {swa-root}/client/{output-format}/{requested-path}
      * source paths do not need to have filename extensions
      * create compiled files whose paths are later accesible by bundle-ids
      # client-static-config-create example
@@ -55,7 +55,11 @@
          js (\"content/view\")))")
 
   (define client-output-path "assets/")
-  (define (client-output-directory swa-root) (string-append swa-root "root/"))
+
+  (define (client-output-directory swa-env)
+    (string-append (swa-env-root swa-env)
+      (ensure-trailing-slash (or (ht-ref-q (swa-env-config swa-env) client-output-path) "webroot/"))))
+
   (define (file->list read path) (call-with-input-file path (l (port) (port->list read port))))
   (define (log-missing-file a) (log-message (q error) (string-append "missing file \"" a "\"")) #f)
   (define (search-env-path* a) (first-or-false (search-env-path (list a))))
@@ -85,35 +89,34 @@
             (map tail bindings)))
         (throw (q template-not-found) source))))
 
-  (define (client-delete-compiled-files swa-root)
+  (define (client-delete-compiled-files swa-env)
     "deletes all files in the client data output directory with an underscore as prefix,
      which should only be previously generated client-code files"
     (let (format-name-strings (map symbol->string (vector->list (ht-keys client-ac-config))))
       (each
         (l (format)
           (let
-            (path (string-append (client-output-directory swa-root) client-output-path format "/"))
+            (path (string-append (client-output-directory swa-env) client-output-path format "/"))
             (if (file-exists? path)
               (each delete-file (directory-list-full path (l (a) (string-prefix? "_" a)))))))
         format-name-strings)))
 
-  (define (client-source-full-path swa-root path format format-suffixes)
+  (define (client-source-full-path swa-env path format format-suffixes)
     (if (string-prefix? "/" path) path
       (let*
-        ( (path (string-append swa-root "client/" (symbol->string format) "/" path))
+        ( (path (string-append (swa-env-root swa-env) "client/" (symbol->string format) "/" path))
           (found-path
             (if (file-exists? path) path
               (any (l (suffix) (let (b (string-append path suffix)) (and (file-exists? b) b)))
                 format-suffixes))))
         (or found-path (log-missing-file path)))))
 
-  (define (prepare-sources swa-root sources output-format)
+  (define (prepare-sources swa-env sources output-format)
     "any list symbol [integer] -> any
      allow to source file paths without filename suffix"
     (let (format-suffixes (ht-ref client-format-suffixes output-format null))
       (filter-map
-        (l (a)
-          (if (string? a) (client-source-full-path swa-root a output-format format-suffixes) a))
+        (l (a) (if (string? a) (client-source-full-path swa-env a output-format format-suffixes) a))
         sources)))
 
   (define (template-sxml->html source port options) "string/sxml port hashtable -> string"
@@ -205,7 +208,7 @@
 
   (define (client-port swa-env output-format port-output bindings sources)
     "port symbol port ((symbol:name . any:value) ...):template-variables list -> unspecified"
-    (and-let* ((sources (prepare-sources (swa-env-root swa-env) sources output-format)))
+    (and-let* ((sources (prepare-sources swa-env sources output-format)))
       (ac-compile client-ac-config output-format
         sources port-output
         (ht-create-symbol-q template-environment
@@ -215,13 +218,14 @@
 
   (define* (client-file swa-env output-format bindings sources #:optional file-name)
     "vector symbol false/list:alist:template-variables list -> string:url-path
-     destination-path template: {swa-root}/root/assets/{output-format}/_{sources-dependent-name}"
+     default destination-path template: {swa-root}/webroot/assets/{output-format}/_{sources-dependent-name}"
     (and-let*
-      ( (output-directory (client-output-directory (swa-env-root swa-env)))
-        (config (swa-env-config swa-env)) (mode (ht-ref-q config mode (q production)))
+      ( (output-directory (client-output-directory swa-env)) (config (swa-env-config swa-env))
+        (mode (ht-ref-q config mode (q production)))
+        (web-base-path (ht-ref-q config web-base-path "/"))
         (when
           (or (ht-ref-q config client-file-when) (if (eq? (q development) mode) (q always) (q new))))
-        (sources (prepare-sources (swa-env-root swa-env) sources output-format))
+        (sources (prepare-sources swa-env sources output-format))
         (path
           (ac-compile->file client-ac-config output-format
             sources (string-append output-directory client-output-path)
@@ -231,7 +235,7 @@
               (ht-ref (swa-env-config swa-env) (q template-environment) template-default-env) mode
               mode template-bindings (bindings-add-swa-env swa-env bindings))
             #:file-name file-name)))
-      (string-append "/" (string-drop-prefix output-directory path))))
+      (string-append web-base-path (string-drop-prefix output-directory path))))
 
   (define-syntax-rule (client-static-config-create (bundle-id format/sources ...) ...)
     (client-static-config-create-p (qq ((bundle-id format/sources ...) ...))))
