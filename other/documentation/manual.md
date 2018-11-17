@@ -184,45 +184,6 @@ symbol:content-type-identifier respond-argument ... -> swa-http-response
 * the content type identifiers supported by default are: ``json``, ``html``, ``js``, ``css``, ``text``
 * the hash-table ``swa-http-key->mime-type`` defines the content types and can be extended
 
-## respond-html
-examples
-```
-(respond-html #f "testfile")
-(respond-html #f (list "append-this-file" "and-this-file" "and-this-one"))
-(respond-html #f (list "append-this-file-with" (list "into-this-file" "insert-this-file" "insert-insert-this-file") "append-this"))
-(respond-html #f (list (list (list (quote div) "sxml starts here"))))
-(respond-html #f (quote (((div "sxml starts here")))))
-(respond-html #f (list (list (lambda (v content) "template procedure") "testfile-for-content")))
-(respond-html (quote ((myvariable . 2) (othervariable . 3))) (list (lambda (v content) (v (quote myvariable)))))
-```
-
-### signature
-```
-false/((symbol:key . any:value) ...):alist:variables template-source ... -> swa-http-response
-```
-
-### description
-this uses client-html from [(sph web app client)](http://sph.mn/c/view/7u).
-sources are given in "template-source" format which is simple to use but supports several ways to specify sources and has the following type-signature
-
-```
-string:path/procedure/port -> swa-http-response
-```
-or
-```
-(string:path/procedure/port/(string:path:wrapped/procedure/port/list:sxml ...) ...) -> swa-http-response
-```
-
-elements on the first level of the list are appended, elements on the second nesting level are composed (inserted from right to left into each other using the content variable available in templates), elements on the third nesting level are template content specified directly
-
-template procedures have the signature
-```
-procedure:{symbol:variable-name [any:default] -> any}:v any:content -> sxml
-```
-
-the first argument to template procedures is a procedure that returns the values of template variables.
-the second argument is the content received from the previous template value for composition, or false if there is none
-
 # configuration files
 web-app itself only has few configuration options, any other keys and values are user controlled and custom. use them in the configuration file and they will be available in the application
 
@@ -234,7 +195,7 @@ configuration files are stored under ``config/``
 * key and value are specified alternatingly
 * keys are symbols
 * indent of two spaces is used for nesting
-* all scheme syntax including comments work
+* all scheme syntax including comments works
 
 example ``config/default``
 ```
@@ -338,16 +299,14 @@ configure the server to serve files from the ``root/`` directory in the web-app 
 * see also the library documentation of [(sph web app client)](http://sph.mn/c/view/7u)
 
 ## template files
-default processors accept source specifications in the [(sph lang template)](http://sph.mn/c/view/q6) format. s-expression based formats can use template variables via unquote and the v procedure in the code
-
 ```
-(div (@ (class test)) (unquote (v (quote example-variable))))
+(div (@ (class test)) (unquote example-variable))
 ```
 
 ```
 (div
   (unquote
-    (if (v (quote example-variable))
+    (if example-variable
       (qq (span "a"))
       (qq (span (@ (class test-class)) "b")))))
 ```
@@ -361,9 +320,9 @@ create a ``client-static`` config object and ``client-static-config-create`` def
 (define client-static-config
   (client-static-config-create
     (default
-      js (#f "main")
+      js ("main")
       css ((example-variable "testvalue" another-variable 3) "main" "otherfile"))
-    (otherbundle js (#f "otherfile"))))
+    (otherbundle js ("otherfile"))))
 ```
 
 sources are specified as for ``client-file`` and relative paths are read from ``{swa-root}/client/{output-format}/{relative-path}``. all available supported formats can be used, for example also plain html and html from sxml. and the source files can also be sjs or plcss, with the file path ``client/css/main.plccs`` for example
@@ -381,15 +340,29 @@ where needed, get the public, server-root relative, path to one or multiple comp
 ## dynamic files
 ``(sph web app client)`` has exports to pre-process files/templates and sets of those on demand
 
+template variables, which are passed in association lists with symbol keys to client file processors, are made available in unquote in the template code
+
 ### client-file
-client-file writes the eventually processed result to a file with an automatically generated file name with an underscore prefix (unless set otherwise using the file-name parameter)
+client-file writes the eventually processed result to a file with an automatically generated file name with an underscore prefix, unless set otherwise using the file-name parameter.
+paths are relative to ``{swa-root}/client/{output-format}/``
+
 ```
-(client-file swa-env output-format template-variables sources #:optional file-name)
-(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) (list "relative-path"))
+(client-file swa-env output-format template-variables file-path #:optional file-name)
+(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) "relative-path")
+```
+
+a template file could contain the following. the content is interpreted as quasiquoted and unquote allows inserting the results of scheme expressions and access to template variables.
+```
+(div (@ (class test)) (unquote a))
+```
+also
+```
+(div (@ (class test)) ,a)
 ```
 
 ### client-port
-client-html, client-css and client-js write the processed content to port directly
+like client-file but writes output to a port
+
 ```
 (client-port swa-env output-format port-output bindings sources)
 ```

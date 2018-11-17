@@ -44,7 +44,7 @@ http://127.0.0.1:6500
 * the scgi servers are for use with a proxy like nginx for https, automatic chunked-encoding, fast file transfers, keep-alive, websockets, load-balancing, caching, general http robustness and more
 * optional modules
   * http requests/responses
-  * templating with s-expression versions of [xml (sxml)]("https://en.wikipedia.org/wiki/SXML"), css [(plcss)](http://sph.mn/c/browse/link-view/sph-lang-plcss/library/documentation) and javascript [(sescript)](https://github.com/sph-mn/sescript)
+  * templating with s-expression versions of [xml (sxml)]("https://en.wikipedia.org/wiki/SXML"), css [(plcss)](http://sph.mn/computer/software/sph-lib/plcss.html) and javascript [(sescript)](https://github.com/sph-mn/sescript)
   * asset processing: transcompilation, bundling, minification, compression, formatting, etc
 * fast
   * plain vectors as records for request and response objects
@@ -61,10 +61,6 @@ an example project can be created with
 web-app --example project-name
 ```
 
-sourcecode of live projects
-* [smaller project that does not use a database](http://files.sph.mn/sourcecode/ytilitu)
-* [a content management system](http://files.sph.mn/sourcecode/sph-cms)
-
 # dependencies
 * [guile](https://www.gnu.org/software/guile/guile.html)
 * [sph-lib](https://github.com/sph-mn/sph-lib)
@@ -74,8 +70,8 @@ sourcecode of live projects
 # installation
 * install all dependencies if there are some
 * [download](http://files.sph.mn/u/software/releases)
-  * alternatives: [git clone](https://github.com/sph-mn/sph-web-app), [sph.mn](http://sph.mn/git/download/sph-web-app.stable.tgz)
-* unpack the downloaded archive. for example with "tar -xf sph-web-app.tgz" (-x is for extract, -f is for the input file)
+  * alternatives: [git clone](https://github.com/sph-mn/sph-web-app)
+* unpack the downloaded archive. for example with "tar -xf sph-web-app.tgz" (-x for extract, -f for the input file)
 
 ```shell
 cd sph-web-app
@@ -86,14 +82,8 @@ su root
 the installer copies files and sets their filesystem permissions. the script can take one argument, the path prefix to install to
 
 ## pacman package
-using [aurget](https://github.com/pbrisbin/aurget)
+for example using [aurget](https://github.com/pbrisbin/aurget)
 
 ```shell
 aurget -S --deps sph-web-app-git
 ```
-
-# related
-* [(sph lang template)](http://sph.mn/c/view/q6)
-* [(sph scgi)](http://sph.mn/c/view/m6)
-* [(sph lang plcss)](http://sph.mn/c/view/fq)
-* [sxml](http://okmij.org/ftp/Scheme/SXML.html)
