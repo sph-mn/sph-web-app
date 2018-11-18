@@ -12,7 +12,7 @@ small but scheme-typically powerful web application framework
 
 (define swa-app (swa-app-new app-respond))
 
-(swa-start swa-app (getcwd) #f swa-server-guile)
+(swa-start swa-app #f #f swa-server-guile)
 ```
 
 put the above in a file ``example.scm`` then
@@ -54,12 +54,6 @@ http://127.0.0.1:6500
 # documentation
 [web-app manual](other/documentation/manual.md)
 
-## other learning resources
-an example project can be created with
-```shell
-web-app --example project-name
-```
-
 # dependencies
 * [guile](https://www.gnu.org/software/guile/guile.html)
 * [sph-lib](https://github.com/sph-mn/sph-lib)
@@ -67,7 +61,7 @@ web-app --example project-name
   * [sescript](https://github.com/sph-mn/sescript) (for (sph web app client))
 
 # installation
-* install all dependencies if there are some
+* install all dependencies
 * [download](http://files.sph.mn/u/software/releases)
   * alternatives: [git clone](https://github.com/sph-mn/sph-web-app)
 * unpack the downloaded archive. for example with "tar -xf sph-web-app.tgz" (-x for extract, -f for the input file)
@@ -78,7 +72,7 @@ su root
 ./exe/install
 ```
 
-the installer copies files and sets their filesystem permissions. the script can take one argument, the path prefix to install to
+the installer is a shell script that copies files and sets filesystem permissions. the script can take one argument, the path prefix to install to
 
 ## pacman package
 for example using [aurget](https://github.com/pbrisbin/aurget)
