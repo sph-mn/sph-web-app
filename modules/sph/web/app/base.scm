@@ -65,5 +65,5 @@
      * find project root from swa-app-name and load-path. module named like swa-app expected to be in project-root/modules/project-name.scm
      * load configuration
      * create the swa-env object and call procedure c, where the app is to be initialised in"
-    (let (root (ensure-trailing-slash root))
+    (let (root (if root (ensure-trailing-slash root) ""))
       (apply c (swa-env-new root (swa-config-get root config) (ht-create-symbol)) swa-app arguments))))
