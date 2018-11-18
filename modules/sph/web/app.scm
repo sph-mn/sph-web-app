@@ -30,7 +30,6 @@
     (sph hashtable)
     (sph io)
     (sph log)
-    (sph record)
     (sph scgi)
     (sph server)
     (sph web app base)
@@ -179,8 +178,8 @@
                   (response
                     (app-respond
                       ; create a swa-http-request object
-                      (record swa-http-request (alist-ref headers "request_uri")
-                        #f headers #f swa-env)))
+                      (swa-http-request-new (alist-ref headers "request_uri") #f
+                        headers #f swa-env #f)))
                   (res-headers
                     (read-headers
                       (open-input-string
@@ -233,7 +232,7 @@
                 (l (headers) "list -> swa-http-response"
                   (swa-http-parse-query headers
                     (l (path arguments)
-                      (app-respond (record swa-http-request path arguments headers client swa-env)))))
+                      (app-respond (swa-http-request-new path arguments headers client swa-env #f)))))
                 client path/headers c)))
           swa-env a))))
 

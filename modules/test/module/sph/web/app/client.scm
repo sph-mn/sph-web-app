@@ -2,7 +2,6 @@
   (import
     (sph io)
     (sph list)
-    (sph record)
     (sph hashtable)
     (sph web app client)
     (sph web app start))
@@ -10,7 +9,7 @@
   ; tests currently depend on csstidy and uglifyjs being available in PATH
 
   (define swa-env
-    (record swa-env-record "/tmp/"
+    (swa-env-new "/tmp/"
       (ht-create-symbol-q test "/tmp/") (ht-create-symbol-q mode (q production)) (ht-create-symbol)))
 
   (define-test (client-html)

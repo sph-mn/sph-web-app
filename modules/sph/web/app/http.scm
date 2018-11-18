@@ -8,7 +8,6 @@
     swa-http-create-response
     swa-http-header-content-type
     swa-http-parse-query
-    swa-http-request
     swa-http-request-client
     swa-http-request-cookie
     swa-http-request-data
@@ -17,6 +16,7 @@
     swa-http-request-https?
     swa-http-request-if-modified-since
     swa-http-request-method
+    swa-http-request-new
     swa-http-request-path
     swa-http-request-query
     swa-http-request-query-parse
@@ -37,8 +37,8 @@
     (sph)
     (sph alist)
     (sph hashtable)
-    (sph record)
     (sph string)
+    (sph vector)
     (sph web app client)
     (sph web http)
     (only (guile)
@@ -60,10 +60,19 @@
        description
          respond with a type available in swa-http-key->mime-type. json, html, text, css and js are available by default.
        examples
-         (respond-type (q text) responder)
-         (respond-type (q text) 200 headers responder)")
+         (respond-type (quote text) responder)
+         (respond-type (quote text) 200 headers responder)")
 
-  (define-record swa-http-request path query headers client swa-env data)
+  (define swa-http-request-path (vector-accessor 1))
+  (define swa-http-request-query (vector-accessor 2))
+  (define swa-http-request-headers (vector-accessor 3))
+  (define swa-http-request-client (vector-accessor 4))
+  (define swa-http-request-swa-env (vector-accessor 5))
+  (define swa-http-request-data (vector-accessor 6))
+  (define swa-http-request-data-set! (l (a value) (vector-set! a 6 value)))
+
+  (define (swa-http-request-new path query headers client swa-env data)
+    (vector (q swa-http-request) path query headers client swa-env data))
 
   (define (swa-http-request-cookie request) "vector -> alist:parsed-cookie"
     (and-let*
@@ -104,9 +113,16 @@
         (string-split url-path #\?))))
 
   (define-syntax-rules swa-http-create-response ((a) (swa-http-create-response* a))
-    ((status body) (vector status (list) body)) ((status headers body) (vector status headers body)))
+    ((status body) (swa-http-response-new status (list) body))
+    ((status headers body) (swa-http-response-new status headers body)))
 
-  (define-record swa-http-response status headers body)
+  (define swa-http-response-status (vector-accessor 1))
+  (define swa-http-response-headers (vector-accessor 2))
+  (define swa-http-response-body (vector-accessor 3))
+  (define swa-http-response-headers-set! (l (a value) (vector-set! a 2 value)))
+
+  (define (swa-http-response-new status headers body)
+    (vector (q swa-http-response) status headers body))
 
   (define-as swa-http-key->mime-type ht-create-symbol-q
     json "application/json" html "text/html" text "text/plain" css "test/css" js "text/javascript")
@@ -163,10 +179,10 @@
 
   (define (swa-http-respond swa-env app-respond headers client)
     "list:response-header:(string:header-line ...) port procedure:{string:uri list:headers port:client} ->
-     receives a request and applies app-respond with a request object and sends the response"
+     receives a request and calls app-respond with a request object and sends the response"
     (swa-http-response-send
       (app-respond
-        (record swa-http-request (alist-ref headers "request_uri") #f headers client swa-env #f))
+        (swa-http-request-new (alist-ref headers "request_uri") #f headers client swa-env #f))
       client))
 
   (define (swa-http-respond-query swa-env app-respond headers client)
@@ -175,7 +191,7 @@
     (swa-http-response-send
       (swa-http-parse-query headers
         (l (path arguments)
-          (app-respond (record swa-http-request path arguments headers client swa-env))))
+          (app-respond (swa-http-request-new path arguments headers client swa-env #f))))
       client))
 
   (define-syntax-rule (respond a ...) (swa-http-create-response a ...))

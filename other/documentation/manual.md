@@ -1,194 +1,108 @@
 # web-app manual
 
-# project creation
-web-app projects are stored in one directory. the command ``web-app``, which should have been installed with sph-web-app, can create a rudimentary project structure. it can also create an example project that showcases features. it is not necessary to use this command but it may be helpful for beginners
+sph-web-app is a library for processing requests and responses from sockets with helpers for handling http web requests.
+the most basic function is to start a server, call a custom handler procedure with request objects and send response objects to the client
 
-```
-parameters
-  options ... target
-description
-  creates new (web app) projects
-options
-  --example  creates an example project
-  --help | -h
-  --interface
-```
+## example
+content of file `example.scm`
+```scheme
+(import (sph web app) (sph web app http))
 
-execute
+(define (app-respond request) (respond "test"))
 
-```
-web-app project-name
+(define swa-app (swa-app-new app-respond))
+
+(swa-start swa-app #f #f swa-server-guile)
 ```
 
-to create a new project in the current directory. replace project-name with the name of your project
-
-# the main module
-* "modules/project-name.scm" should be a scheme module and export at least one binding: ``swa-app`` - a swa-app object (a vector)
-* this module is to be the main application entry point for responding to requests as well as what is needed for application initialisation and deinitialisation
-* an application can be completely defined in one module. for bigger applications it usually makes sense to split the code into multiple modules
-* to create a swa-app object use ``swa-app-new``
-```
-(swa-app-new respond #:key init deinit)
+shell command
+```shell
+guile example.scm
 ```
 
-example ``modules/project-name.scm``
-
+shell standard output
 ```
-(library (project-name)
-  (export swa-app)
-  (import
-    (rnrs base)
-    (sph web app)
-    (sph web app http))
-
-  (define (app-respond request)
-    (respond "test"))
-
-  (define swa-app (swa-app-new app-respond)))
-```
-
-``(sph web app http)`` contains the ``respond`` binding for http response objects
-
-# startup
-the application and server is best started from a separate executable file, for example "exe/start"
-
-example file ``exe/start``
-```
-#!/usr/bin/guile
-!#
-(import (sph web app) (project-name))
-(swa-start swa-app "default" swa-server-scgi)
-```
-
-``project-name`` needs to be in guiles load path to be found as a module (``$GUILE_LOAD_PATH``, ``guile -L``, ``%load-path``).
-when the file has the filesystem executable permission bit set (``chmod +x exe/start``), it can be run from the project root with:
-
-```
-./exe/start
-```
-
-displayed should be something like:
-
-```
-listening on /tmp/1000/scgi
+listening on 127.0.0.1:6500
 exit with ctrl+c
 ```
 
-which means the server is running and the application ready for use.
-
-note that scgi is an intermediate interface for communication between a proxy server and the application and that in this case a scgi capable proxy server will be required to access the application via http, see below
-
-signature of swa-start
+application browser accessible at
 ```
-swa-app false/hashtable/string:configuration server server-arguments ... -> unspecified
+http://127.0.0.1:6500
 ```
 
-# proxy setup
-a proxy is not necessary if instead of swa-server-scgi, swa-server-guile is used. however, scgi is the recommended way because scgi is an interface that allows an established http server to do the work of http request parsing and connection management - and there are servers that do this well, stable and fast.
-for example nginx allows for fast file transfers without redirection through the application (x-accel), https, keep-alive requests, chunked encoding, gzip compression, load-balancing and much more. to do this, set up a server to interface with the socket that is created when starting the application with the scgi server (the path is displayed when the server starts). nginx, apache and lighttp support it
+# libraries
+* `(sph web app)` core features and servers
+* `(sph web app http)` http request and response features
+* `(sph web app client)` client code or asset processing (css, js, etc)
 
-see [nginx example configuration for scgi and web-app](nginx.md)
+# app
+a swa-app object contains the request handler procedure to be used and optionally procedures called before or after the server runs
 
-# requests
-``app-respond`` from the main module receives a request object
-
-## fields
-* path: ``string``, current request path
-* query: ``false/((string . any) ...)``, parsed query string, but only if ``#:parse-query? #t`` was passed to swa-start
-* headers: ``((string . any) ...)``, alist of parsed http headers
-* client: ``input/output port``, can be used for reading from the client. should not be used for writing but a procedure should be used in the response object, so that the server can write the headers before sending the response body
-* swa-env: ``vector``
-* data: ``false/hashtable``, custom data can be set here
-
-## example field access
+## create a new swa-app
 ```
-(swa-http-request-path request)
+(swa-app-new app-respond)
 ```
 
-## path based routing
+signatures
 ```
-(import (sph web app) (sph web app http))
-
-(define (app-respond request)
-  (match-path (swa-http-request-path request)
-    (() (start-page request))
-    (("c" "browse") (c-browse request #f (list)))
-    (("c" "browse" type tags ...) (c-browse request type tags))
-    (("robots.txt") (respond-type (quote text) "User-Agent: *\nDisallow: /c/browse/link/"))
-    (_ (respond 404))))
+swa-app-new :: procedure:respond [#:init procedure #:deinit procedure] -> swa-app
+respond :: request -> response
+init :: swa-env -> any/swa-env
+deinit :: swa-env -> any/swa-env
 ```
 
-``match-path`` is [(ice-9 match)](https://www.gnu.org/software/guile/manual/html_node/Pattern-Matching.html) except that the path is without the root path, split at slashes, before being passed to match. all features of (ice-9 match) can be used
+example with all options
+```
+(swa-app-new app-respond #:init app-init #:deinit app-deinit)
+```
+
+app-init is called before the server starts, with a swa-env object that contains for example the parsed configuration. app-init can return a new swa-env object to update it.
+app-deinit is like app-init but called after the server finished listening
+
+## access swa-app fields
+```
+swa-app-init :: swa-app -> procedure
+swa-app-deinit :: swa-app -> procedure
+swa-app-respond :: swa-app -> procedure
+```
+
+# startup
+to start a server running an app:
+```
+(swa-start swa-app #f #f swa-server-scgi)
+```
+
+signature
+```
+swa-start :: swa-app directory configuration server server-arguments ... -> unspecified
+swa-start :: vector string false/hashtable/string procedure any ... -> unspecified
+server :: swa-env swa-app server-arguments ...
+```
+
+* directory: a root directory for the application (swa-root), relative to which configuration or client files are searched
+* configuration: false for no configuration object, a hashtable for the configuration object or a string for a configuration file name
+* server: a server implementation procedure like the included swa-server-scgi, swa-server-guile or swa-server-internal
 
 ## swa-env
-requests contain a swa-env record, which contains the environment information for the currently initialised application. there is only one such object per application. if it is modified, changes will be available to all requests
+on startup a `swa-env` object is created. swa-app handlers receive the `swa-env` as an argument or inside the request object.
+if a swa-env object is modified, changes are available to all requests.
 
 ### fields
-* root: string, the full path to the current top-level project
-* paths: hashtable, maps project identifiers to project paths
-* config: hashtable, user configuration loaded from the configuration files. not to be modified
-* data: hashtable, for custom run-time values, for example values calculated when the application was initialised
+* root: string: the full path to the app directory
+* config: hashtable: user configuration passed to swa-start or loaded from configuration files
+* data: hashtable: for custom run-time values, for example values calculated when the application was initialised
 
 ### example field access
 ```
 (swa-env-data swa-env)
 ```
 
-# response creation
-the expected response object type depends on the ``send-response`` procedure used by the current server. by default this is ``swa-http-send-response`` from [(sph web app http)](http://sph.mn/c/view/dm). different servers or response sender procedures can be used for protocols other than http
-
-after importing ``(sph web app http)`` you can use the following short respond bindings to create http responses. use them to create procedure results subsequently returned from app-respond
-
-## respond
-examples
-```
-(respond 200)
-(respond "test")
-(respond 200 "test")
-(respond 200 (list) "test")
-(respond (lambda (client) (display "test" client)))
-(respond 200 (list "content-type:text/plain\r\n") (lambda (client) (display "test" client)))
-```
-
-### signature
-* form 1
-  * ``false/integer/string/vector/procedure -> vector``
-  * ``status-code/response-body/swa-http-response/{port:client -> unspecified} -> swa-http-response``
-* form 2
-  * ``integer false/string/vector/procedure -> vector``
-* form 3
-  * ``integer list:(string:crlf-terminated-header-line ...) false/string/vector/procedure -> vector``
-
-### description
-creates an http response record. the argument for the response-body parameter is interpreted by the sender procedure as follows:
-
-* procedure: called with a port for bidirectional communication with the client
-* integer: http status code, empty response-body
-* string: http 200, string as response-body
-* boolean-false: 404
-* vector: a swa-http-response-record
-* other: http 200, empty response-body
-
-## respond-type
-examples
-```
-(respond-type (quote json) "{\"test\": 1}")
-(respond-type (quote text) 200 (list) "test")
-```
-### signature
-```
-symbol:content-type-identifier respond-argument ... -> swa-http-response
-```
-### description
-* like ``respond`` but takes an additional argument for the response content-type
-* the content type identifiers supported by default are: ``json``, ``html``, ``js``, ``css``, ``text``
-* the hash-table ``swa-http-key->mime-type`` defines the content types and can be extended
-
 # configuration files
-web-app itself only has few configuration options, any other keys and values are user controlled and custom. use them in the configuration file and they will be available in the application
+app configuration can be stored in files that are parsed on startup and available to swa-app handlers. some keys are recognised and used by sph-web-app features, like for example keys for server configuration used by server implementations. otherwise key associations are custom and can be freely made
 
 ## where
-configuration files are stored under ``config/``
+configuration files are expected to be under `{swa-root}/config/`
 
 ## syntax
 * all elements are scheme expressions
@@ -197,7 +111,7 @@ configuration files are stored under ``config/``
 * indent of two spaces is used for nesting
 * all scheme syntax including comments works
 
-example ``config/default``
+example `config/default`
 ```
 default-title "project-name"
 server
@@ -208,7 +122,7 @@ types (2 4 5)
 ```
 
 ## derivation
-other configuration files derive from "default". in other configuration files, any key from default that is not used takes its default value from default.
+configuration files derive from a configuration file "default" it that exists. in other configuration files, any key from default that is not overwritten keeps its value from default.
 for example, if there is a file "config/development" that contains only:
 
 ```
@@ -219,7 +133,7 @@ and swa-start is instructed to use this configuration with the name development,
 this can be used to create multiple configuration files with minor differences for different environments, for example for different server hosts
 
 ## access
-configuration will be available as a hashtable in swa-env in the field "config". it can be retrieved by calling (swa-env-config swa-env)
+configuration will be available as a hashtable in swa-env in the field "config". it can be retrieved by calling `(swa-env-config swa-env)`
 
 example
 ```
@@ -227,158 +141,14 @@ example
   (hashtable-ref config (quote option-name)))
 ```
 
-``(sph hashtables)`` contains helpers to work with nested hashtables, example
-
-```
-(ht-tree-ref-q config option-name nested-option-name nested-nested-option-name)
-```
-
-``-q`` indicates that the values used for keys are automatically quoted
-
-# directory structure
-there is no fundamentally required directory structure. there are some required directories depending on optional features used. if you specify a configuration name, "config/" is needed, if you use (sph web app client), "client/" and "root/" is needed, but the rest can be freely adapted
-
-nevertheless, there is a recommended directory structure for web-app. in the following listing, words with filename extensions are files and words enclosed with {} are non-literal, user-chosen names, other words are directories and indent marks directory structure nesting
-
-```
-{project-name}
-  modules
-    {project-name}.scm
-    {project-name}
-      controller
-      helper
-      http
-      model
-      other
-      view
-    test
-      module helper
-  client
-    {output-format-extension} ...
-      {name}.{input-format-extension}
-  config
-    default
-    {config-name}
-  exe
-    start
-  root
-    assets
-      {output-format-extension} ...
-  other temp data
-```
-
-* root: the only directory directly accessible for web server clients. the document root for a (proxy) web server. contains compiled client code files under assets and any static files that should be accessible to clients without redirection through the application. the name "root" was chosen in favor of "public" or "shared"
-* exe: contains executable files for general project management. for example for starting the application or custom helper scripts. the name "exe" was chosen in favor of "bin" or "script"
-* client: the client directory contains code or sources and templates for code that is to be evaluated by the client. for example html, css or javascript
-* http: procedures that take http requests and create http responses
-* controller: combines model and view to create the response content. prefix bindings with c- (controller, model and view tend to use the same names for bindings)
-* model: returns data for controllers, for example from a database. prefix bindings with m-
-* view: returns what is necessary for presenting the data from the model. for example directly generated shtml not read from files under client/. prefix bindings with v-
-* other: modules that do not fit into the other directories. lib
-* test/module: contains scheme modules for running tests. for example using (sph test)
-* test/helper: contains helper modules for writing tests
-* data: for application content data like database files
-
-examples
-* [smaller project that does not use a database](http://files.sph.mn/sourcecode/ytilitu)
-* [a content management system](http://files.sph.mn/sourcecode/sph-cms)
-
-# serving static files
-## with scgi and an http proxy server
-configure the server to serve files from the ``root/`` directory in the web-app project directly, without forwarding incoming file requests to the scgi application
-
-## without scgi and an http proxy server
-* the file sending is the responsibility of the application
-* match file requests as appropriate, read files and write their content to the client port
-
-# client code
-* source formats recognised by default: html, css, javascript, sxml, plcss, sescript
-* target formats supported by default: html, css, javascript
-* code to be executed by the client can be created directly where needed in scheme procedures or loaded from external files under ``client/{format-name}/``
-* import (sph web app client) to use the following features. it supports most common ways of file pre-processing, including pre-compilation, concatenation, compression, formatting, templating, template variables and custom processors for any file format
-* see also the library documentation of [(sph web app client)](http://sph.mn/c/view/7u)
-
-## template files
-```
-(div (@ (class test)) (unquote example-variable))
-```
-
-```
-(div
-  (unquote
-    (if example-variable
-      (qq (span "a"))
-      (qq (span (@ (class test-class)) "b")))))
-```
-
-## static files
-create a ``client-static`` config object and ``client-static-config-create`` defines file bundles that have ids
-
-```
-(import (sph web app client))
-
-(define client-static-config
-  (client-static-config-create
-    (default
-      js ("main")
-      css ((example-variable "testvalue" another-variable 3) "main" "otherfile"))
-    (otherbundle js ("otherfile"))))
-```
-
-sources are specified as for ``client-file`` and relative paths are read from ``{swa-root}/client/{output-format}/{relative-path}``. all available supported formats can be used, for example also plain html and html from sxml. and the source files can also be sjs or plcss, with the file path ``client/css/main.plccs`` for example
-
-in app-init, call
-```
-(client-static-compile swa-env client-static-config)
-```
-
-where needed, get the public, server-root relative, path to one or multiple compiled bundle files with client-static
-```
-(client-static swa-env (quote css) (quote (bundle-name other-bundle-name)))
-```
-
-## dynamic files
-``(sph web app client)`` has exports to pre-process files/templates and sets of those on demand
-
-template variables, which are passed in association lists with symbol keys to client file processors, are made available in unquote in the template code
-
-### client-file
-client-file writes the eventually processed result to a file with an automatically generated file name with an underscore prefix, unless set otherwise using the file-name parameter.
-paths are relative to ``{swa-root}/client/{output-format}/``
-
-```
-(client-file swa-env output-format template-variables file-path #:optional file-name)
-(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) "relative-path")
-```
-
-a template file could contain the following. the content is interpreted as quasiquoted and unquote allows inserting the results of scheme expressions and access to template variables.
-```
-(div (@ (class test)) (unquote a))
-```
-also
-```
-(div (@ (class test)) ,a)
-```
-
-### client-port
-like client-file but writes output to a port
-
-```
-(client-port swa-env output-format port-output bindings sources)
-```
-
-## changing file processors
-modify the `client-ac-config` hashtable, which maps `output-format-symbol` to `(ac-output ac-input ...)`, see also `modules/sph/filesystem/asset-compiler.scm` and `client.scm`
-
 # servers
 ## included
-
 the following servers are available by default and can be used with swa-start
 
 ### sph server scgi
 starts a "simple common gateway interface" [(scgi)](http://python.ca/scgi/protocol.txt) server to be used as a backend for an http proxy that supports scgi. if you have heard of fastcgi, scgi is a bit like fastcgi but much simpler
 
-``swa-server-scgi``
+`swa-server-scgi`
 
 ### sph server fibers
 a scgi server that uses non-blocking input/output with [fibers](https://github.com/wingo/fibers/). usage
@@ -397,11 +167,13 @@ the http server that comes with guile
 ``swa-server-guile``
 
 ### internal
-does not create a socket and calls a procedure with the initialised application. can be used for testing. usage
+does not create a socket and calls a procedure with the initialised application. can be used for testing
+
+example
 ```
-(swa-start swa-app "default" swa-server-internal
+(swa-start swa-app (getcwd) "default" swa-server-internal
   (lambda (swa-env app-respond)
-    (app-respond (record swa-http-request path arguments headers client swa-env))))
+    (app-respond (swa-http-request-new path arguments headers client swa-env #f))))
 ```
 
 ## common configuration options
@@ -415,21 +187,204 @@ server (
 ```
 
 without those options specified the default is to create a local unix socket at the following path
-
 ```
 /tmp/$UID/scgi
 ```
 
 ### how to set the local socket path
-set the ``listen-address`` option in the configuration file to the desired filesystem path
+set the `listen-address` option in the configuration file to the desired filesystem path
 
 ### how to use a tcp socket
-set ``listen-address`` to a string with the ip4 or ip6 address to bind to and listen-port to the port number to use
+set `listen-address` to a string with the ip4 or ip6 address to bind to and listen-port to the port number to use
 
 ```
 server (
   listen-address "::1"
   listen-port 6500)
+```
+
+# http requests
+the swa-app respond procedure is called for each request with a request object that contains information about the current request.
+the type of the object depends on the server implementation used. for `swa-server-scgi` and `swa-server-guile`, it is a request object from `(sph web app http)`.
+
+## request object fields
+* path: `string`, current request path
+* query: `false/((string . any) ...)`, parsed query string. only available if `#:parse-query? #t` was passed to `swa-start`
+* headers: `((string . any) ...)`, alist of parsed http headers
+* client: `input-output-port`, can be used for reading from the client. should not be used for writing as sending the response is done when processing the response object
+* swa-env: `vector`
+* data: `false/hashtable`, custom data can be set here
+
+## to load swa-http-request related bindings
+```
+(import (sph web app) (sph web app http))
+```
+
+## example field access
+```
+(swa-http-request-path request)
+```
+
+## path based routing
+```
+(match-path (swa-http-request-path request)
+  (() (start-page request))
+  (("c" "browse") (c-browse request #f (list)))
+  (("c" "browse" type tags ...) (c-browse request type tags))
+  (("robots.txt") (respond-type (quote text) "User-Agent: *\nDisallow: /c/browse/link/"))
+  (_ (respond 404)))
+```
+
+``match-path`` is like [(ice-9 match)](https://www.gnu.org/software/guile/manual/html_node/Pattern-Matching.html), except that the path is without the root path portion split at slashes before being passed to `match`. all features of `(ice-9 match)` can be used
+
+# http responses
+for swa-server-scgi and swa-server-guile, the app respond procedure is expected to return swa-app-http-response objects from `(sph web app http).
+
+## create a http response object
+examples
+```
+(respond 200)
+(respond "test")
+(respond 200 "test")
+(respond 200 (list) "test")
+(respond (lambda (client) (display "test" client)))
+(respond 200 (list "content-type:text/plain\r\n") (lambda (client) (display "test" client)))
+```
+
+### signatures
+form 1
+```
+false/integer/string/procedure:{port:client -> unspecified} -> vector
+status-code/response-body/response-body-writer -> response
+```
+
+form 2
+```
+integer false/string/procedure -> vector
+status-code response-body/response-body-writer -> response
+```
+
+```
+integer list:(string:crlf-terminated-header-line ...) false/string/procedure -> vector
+status-code headers response-body/response-body-writer -> response
+```
+
+* response-body-writer: procedure: called with a port for bidirectional communication with the client after the headers have been sent. for example to read a post request body
+* integer: http status code
+* string: response-body
+* false: http status 404
+
+## respond-type
+`respond-type` is like `respond` but sets the content-type header based on a symbol identifier.
+type identifiers supported by default are: `json`, `html`, `js`, `css`, `text`.
+the hashtable `swa-http-key->mime-type` from `(sph web app http)` defines the types and can be extended
+
+examples
+```
+(respond-type (quote json) "{\"test\": 1}")
+(respond-type (quote text) 200 (list) "test")
+```
+
+signature
+```
+symbol:content-type-identifier respond-argument ... -> swa-http-response
+```
+
+# client code and assets
+* code to be executed by the client can be created directly where needed in scheme procedures or loaded from external files under ``client/{format-name}/``
+* source formats recognised by default: html, css, javascript, sxml, plcss, sescript
+* target formats supported by default: html, css, javascript
+* import `(sph web app client)` to use the following features
+
+## configuration options
+```
+client-output-path "webroot/"
+web-base-path "/"
+```
+
+## static files
+static files are either in the web root and handled by a proxy webserver (possibly using features like x-accel-redirect), or read and send by the application.
+for compiled static files, create a `client-static` config object and define file bundles with `client-static-config-create`
+
+```
+(import (sph web app client))
+
+(define client-static-config
+  (client-static-config-create
+    (default
+      js ("main")
+      css ((example-variable "testvalue" another-variable 3) "main" "otherfile"))
+    (otherbundle js ("otherfile"))))
+```
+
+sources are specified as for `client-file` and paths are used like this `{swa-root}/client/{output-format}/{relative-path}`. all available supported formats can be used, for example also plain html and html from sxml. and the source files can also be sjs or plcss, with the file path `client/css/main.plccs` for example
+
+in `app-init`, call
+```
+(client-static-compile swa-env client-static-config)
+```
+
+where needed, get the public path to one or multiple compiled bundle files with `client-static`
+```
+(client-static swa-env (quote css) (quote (bundle-name other-bundle-name)))
+```
+
+## dynamic files
+``(sph web app client)`` has exports to pre-process files/templates and sets of those on demand
+
+template variables, which are passed in association lists with symbol keys to client file processors, are made available in unquote in the template code
+
+### client-file
+client-file writes the eventually processed result to a file with an automatically generated file name with an underscore prefix, unless set otherwise using the file-name parameter.
+paths are relative to ``{swa-root}/client/{output-format}/``
+
+```
+(client-file swa-env output-format template-variables file-path #:optional file-name)
+(client-file swa-env (quote js) (quote ((a . 2) (b . 3))) "relative-path")
+```
+
+### client-port
+like client-file but writes output to a port
+
+```
+(client-port swa-env output-format port-output bindings sources)
+```
+
+## template files
+both the static and dynamic `client-` bindings read s-expression based formats like sxml, plcss and sescript as templates.
+templates are interpreted as if being quasiquoted, and unquote can be used to insert results of scheme expressions and access template variables.
+
+example file content with insert of a template variable `a`
+```
+(div (@ (class test)) (unquote a))
+```
+also
+```
+(div (@ (class test)) ,a)
+```
+
+example 2
+```
+(div
+  (unquote
+    (if example-variable
+      (qq (span "a"))
+      (qq (span (@ (class test-class)) "b")))))
+```
+
+## change file processors
+modify the `client-ac-config` hashtable, which maps `output-format-symbol` to `(ac-output ac-input ...)`, see also `modules/sph/filesystem/asset-compiler.scm` and `client.scm`
+
+example
+```
+(import (sph filesystem asset-compiler) (sph web app client) (rnrs hashtables))
+
+(hashtable-set! client-ac-config (quote tar)
+  (list
+    (ac-config-output (quote tar) ".tar" ac-output-copy)
+    (ac-config-input (quote tgz) ".tgz"
+      (lambda (source next-port options)
+        (call-with-input-file source (lambda (file) (decompress file next-port)))))))
 ```
 
 # deriving from projects
@@ -447,46 +402,95 @@ for example in modules/sph-mn.scm
   (respond "i'm derived"))
 
 (define swa-app
-  (swa-app-new app-respond
+ (swa-app-new app-respond
     #:init app-init #:deinit (swa-app-deinit cms-swa-app)))
 ```
 
-this imports the swa-app object from (sph-cms) with the identifier prefixed with cms- to avoid a name conflict in the current module, then uses the swa-app object accessor swa-app-init to retrieve the other app-init procedure and calls it with the swa-env.
-static files from imported project root/ directories will be symlinked into the parent projects root/ unless their file name starts with an underscore. static files that are compiled will be saved in the parent project
+this imports the swa-app object from (sph-cms) with the identifier prefixed with cms- to avoid a name conflict in the current module, then uses the swa-app object accessor swa-app-init to retrieve the other app-init procedure and calls it with the swa-env. all client files that are compiled are saved in the current/parent swa-root
+
+# proxy setup
+a proxy is not necessary if instead of swa-server-scgi, swa-server-guile is used. however, scgi is the recommended way because scgi is an interface that allows an established http server to do the work of http request parsing and connection management - and there are servers that do this well, stable and fast.
+for example nginx allows for fast file transfers without redirection through the application (x-accel), https, keep-alive requests, chunked encoding, gzip compression, load-balancing and much more. to do this, set up a server to interface with the socket that is created when starting the application with the scgi server (the path is displayed when the server starts). nginx, apache and lighttp support it
+
+see [nginx example configuration for scgi and web-app](nginx.md)
 
 # deployment
 the target host needs to have guile and sph-web-app set up. setup is the same as for local development environments
 
-example systemd service file ``/etc/systemd/system/sph-mn.service``
+example systemd service file `/etc/systemd/system/sph-info.service`
 ```
 [Unit]
-Description=sph-mn scgi application
+Description=sph-info scgi application
 
 [Service]
-Environment="GUILE_LOAD_PATH=/opt/web-app/sph-cms/modules:/opt/web-app/sph-mn/modules:/usr/share/guile/2.2:/usr/share/guile/site"
-WorkingDirectory=/opt/web-app/sph-mn
-ExecStart=/opt/web-app/sph-mn/exe/start
+Environment="GUILE_LOAD_PATH=/usr/share/guile/2.2:/usr/share/guile/site"
+WorkingDirectory=/opt/sph-info
+ExecStart=/opt/sph-info/exe/start-dynamic
 Type=simple
 Restart=on-failure
-User=sph-mn
+User=sph-info
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-# extending the asset pipeline
-see [sph web app client](http://sph.mn/c/view/7u) and [sph filesystem asset-compiler](http://sph.mn/c/view/6q).
-extend the hash-table ``client-ac-config``
+# examples
+example project directory with client, config, webroot and custom other directories
 ```
-(import (sph filesystem asset-compiler) (sph web app client) (rnrs hashtables))
-
-(hashtable-set! client-ac-config (quote tar)
-  (list
-    (ac-config-output tar #t ac-output-copy)
-    (ac-config-output tar.gz #t
-      (lambda (source next-port options)
-        (call-with-input-file source (lambda (file) (decompress file next-port)))))))
+exe
+  start
+client
+  css
+    main.css
+  js
+    main.js
+config
+  default
+  development
+modules
+  project-name.scm
+readme.md
+webroot
+  assets
+    css/_main.css
+    js/_main.js
 ```
 
-# logging
-possible with [(sph log)](http://sph.mn/c/view/7q)
+* webroot: the only directory directly accessible for web server clients. the document root for a (proxy) web server. contains compiled client code files under assets and any static files that should be accessible to clients without redirection through the application. the name "root" was chosen in favor of "public" or "shared"
+* exe: contains executable files for general project management. for example for starting the application or custom helper scripts. the name "exe" was chosen in favor of "bin" or "script"
+* client: the client directory contains code or sources and templates for code that is to be evaluated by the client. for example html, css or javascript
+
+example content for a file `exe/start`
+```
+#!/usr/bin/guile
+!#
+
+(add-to-load-path (string-append (getcwd) "/modules"))
+(import (sph) (sph web app) (sph-info))
+
+(apply
+  (l* (#:optional (config "production"))
+      (swa-start swa-app (getcwd) config swa-server-scgi #:parse-query #t))
+        (tail (program-arguments)))
+```
+
+example `modules/project-name.scm`
+
+```
+(library (project-name)
+  (export swa-app)
+  (import
+    (rnrs base)
+    (sph web app)
+    (sph web app http))
+
+  (define (app-respond request)
+    (respond "test"))
+
+  (define swa-app (swa-app-new app-respond)))
+```
+
+start the application
+```
+./exe/start
+```

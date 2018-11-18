@@ -22,15 +22,7 @@
     (only (guile) file-exists? string=)
     (only (sph filesystem) ensure-trailing-slash))
 
-  (define sph-web-app-start-description
-    "core web app initialisation
-     before using swa-start, import (sph web app) and the main module of the current project, for example with (import (sph web app) (myproject main))
-     syntax of swa-start:
-     (swa-start swa-app project-root-path configuration-name handler handler-arguments ...)
-     (swa-start swa-app string string procedure:{vector:swa-env any ... -> any} any ...)
-     example:
-     (swa-start app \"/tmp/myproject\" \"default\" swa-scgi)")
-
+  (define sph-web-app-start-description "core web app features")
   (define swa-app-respond (vector-accessor 1))
   (define swa-app-init (vector-accessor 2))
   (define swa-app-deinit (vector-accessor 3))

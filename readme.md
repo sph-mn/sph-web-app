@@ -2,7 +2,7 @@ small but scheme-typically powerful web application framework
 
 * initialises web applications, starts a server and provides optional modules for some features commonly needed for web projects
 * similar perhaps to express.js
-* status: should work. maintained as of 2018-09
+* status: should work. maintained as of 2018-11
 
 # minimal example
 ```scheme
@@ -35,7 +35,7 @@ http://127.0.0.1:6500
 ```
 
 # features
-* starts a server, passes request objects to handler procedures and transmits response objects
+* reads configuration files, starts a server, passes request objects to handler procedures and transmits response objects
 * protocol agnostic core: socket -> web-app -> socket
 * pluggable server (thread-pool scgi, fibers scgi, direct http, none for testing ...)
 * derivative environment configuration files in an s-expression format
@@ -52,7 +52,6 @@ http://127.0.0.1:6500
   * requests have little overhead as little data has to be prepared
 
 # documentation
-
 [web-app manual](other/documentation/manual.md)
 
 ## other learning resources
