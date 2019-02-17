@@ -264,11 +264,13 @@ integer false/string/procedure -> vector
 status-code response-body/response-body-writer -> response
 ```
 
+form 3
 ```
 integer list:(string:crlf-terminated-header-line ...) false/string/procedure -> vector
 status-code headers response-body/response-body-writer -> response
 ```
 
+### description
 * response-body-writer: procedure: called with a port for bidirectional communication with the client after the headers have been sent. for example to read a post request body
 * integer: http status code
 * string: response-body
