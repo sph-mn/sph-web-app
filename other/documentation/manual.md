@@ -178,12 +178,12 @@ example
 
 ## common configuration options
 ```
-server (
+server
   listen-port 1234
   listen-address "::1"
   socket-name "testname"
   socket-group "http"
-  socket-permissions #o777)
+  socket-permissions #o777
 ```
 
 without those options specified the default is to create a local unix socket at the following path
@@ -198,9 +198,9 @@ set the `listen-address` option in the configuration file to the desired filesys
 set `listen-address` to a string with the ip4 or ip6 address to bind to and listen-port to the port number to use
 
 ```
-server (
+server
   listen-address "::1"
-  listen-port 6500)
+  listen-port 6500
 ```
 
 # http requests
