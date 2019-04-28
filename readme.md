@@ -2,7 +2,7 @@ small but scheme-typically powerful web application framework
 
 * initialises web applications, starts a server and provides optional modules for some features commonly needed for web projects
 * similar perhaps to express.js
-* status: should work. maintained as of 2018-11
+* status: should work. maintained as of 2019-04
 
 # minimal example
 ```scheme
@@ -53,6 +53,8 @@ http://127.0.0.1:6500
 
 # documentation
 [web-app manual](other/documentation/manual.md)
+
+an example project that combines sph-web-app with sph-web-publish: [sph-info](https://github.com/sph-mn/sph-info)
 
 # dependencies
 * [guile](https://www.gnu.org/software/guile/guile.html)

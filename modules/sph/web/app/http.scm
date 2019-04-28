@@ -119,7 +119,7 @@
   (define swa-http-response-status (vector-accessor 1))
   (define swa-http-response-headers (vector-accessor 2))
   (define swa-http-response-body (vector-accessor 3))
-  (define swa-http-response-headers-set! (l (a value) (vector-set! a 2 value)))
+  (define swa-http-response-headers-set! (vector-setter 2))
 
   (define (swa-http-response-new status headers body)
     (vector (q swa-http-response) status headers body))
