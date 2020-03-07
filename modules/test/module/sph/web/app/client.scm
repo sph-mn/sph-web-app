@@ -1,35 +1,29 @@
 (define-test-module (test module sph web app client)
-  (import
-    (sph io)
-    (sph list)
-    (sph hashtable)
-    (sph web app client)
-    (sph web app start))
+  (import (srfi srfi-2) (sph io) (sph list) (sph hashtable) (sph web app client) (sph web app))
 
-  ; tests currently depend on csstidy and uglifyjs being available in PATH
+  "tests currently depend on csstidy and uglifyjs being available in PATH"
 
   (define swa-env
-    (swa-env-new "/tmp/"
-      (ht-create-symbol-q test "/tmp/") (ht-create-symbol-q mode (q production)) (ht-create-symbol)))
+    (swa-env-new "/tmp/" (ht-create-symbol-q mode (q production)) (ht-create-symbol-q test "/tmp/")))
 
   (define-test (client-html)
     (assert-equal "<!doctype html><div>test</div>\n"
       (call-with-output-string
-        (l (out) (client-html swa-env out #f (q test) (list-q ((div "test"))))))))
+        (l (out) (client-port swa-env (q html) out #f (list-q ((div "test"))))))))
 
   (define-test (client-css)
     (assert-equal "div{display:none;}\n"
       (call-with-output-string
-        (l (out) (client-css swa-env out #f (q test) (list-q ((("div" display none)))))))))
+        (l (out) (client-port swa-env (q css) out #f (list-q (("div" display none))))))))
 
   (define-test (client-js)
     (assert-equal "\"use strict\";var a=3;\n"
       (call-with-output-string
-        (l (out) (client-js swa-env out #f (q test) (list (list (list-q (define a 3)))))))))
+        (l (out) (client-port swa-env (q js) out #f (list-q ((define a 3))))))))
 
   (define-test (client-file)
-    (and-let* ((path (client-file-html swa-env #f (q test) (list-q ((div "test"))))))
+    (and-let* ((path (client-file swa-env (q html) #f (list-q ((div "test"))))))
       (assert-equal "<!doctype html><div>test</div>\n"
-        (file->string (string-append (swa-env-root swa-env) "root" path)))))
+        (file->string (string-append (swa-env-root swa-env) "webroot" path)))))
 
-  (test-execute-procedures-lambda client-file client-js client-css client-html))
+  (test-execute-procedures-lambda client-file client-html client-css client-js))

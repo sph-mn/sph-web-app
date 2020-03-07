@@ -1,7 +1,7 @@
 #!/usr/bin/guile
 !#
 
-(import (sph) (sph test))
+(use-modules (sph) (sph test))
 
 (define settings
   (test-settings-default-custom
