@@ -126,24 +126,25 @@
     (plcss->css template-result port) (newline port)))
 
 (define css-output-processor
-  (and-let* ((path-csstidy (search-env-path* "csstidy")))
-    (let
-      ( (format
-          (l (write-input out options)
-            (execute-with-pipes
-              (l (child-in child-out) (begin-thread (write-input child-in) (close-port child-in))
-                (port-copy-all child-out out))
-              path-csstidy (list "-" (cli-option "template" "default") (cli-option "silent" "true"))
-              #t #t)))
-        (compress
-          (l (write-input out options)
-            (execute-with-pipes
-              (l (child-in child-out) (begin-thread (write-input child-in) (close-port child-in))
-                (port-copy-all child-out out))
-              path-csstidy (list "-" (cli-option "template" "highest") (cli-option "silent" "true"))
-              #t #t))))
-      (l (write-input out-port options)
-        ((if (options-development-mode? options) format compress) write-input out-port options)))))
+  (and #f
+    (and-let* ((path-csstidy (search-env-path* "csstidy")))
+      (let
+        ( (format
+            (l (write-input out options)
+              (execute-with-pipes
+                (l (child-in child-out) (begin-thread (write-input child-in) (close-port child-in))
+                  (port-copy-all child-out out))
+                path-csstidy
+                (list "-" (cli-option "template" "default") (cli-option "silent" "true")) #t #t)))
+          (compress
+            (l (write-input out options)
+              (execute-with-pipes
+                (l (child-in child-out) (begin-thread (write-input child-in) (close-port child-in))
+                  (port-copy-all child-out out))
+                path-csstidy
+                (list "-" (cli-option "template" "highest") (cli-option "silent" "true")) #t #t))))
+        (l (write-input out-port options)
+          ((if (options-development-mode? options) format compress) write-input out-port options))))))
 
 (define js-output-processor
   (and-let* ((path-uglifyjs (search-env-path* "uglifyjs")))
