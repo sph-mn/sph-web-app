@@ -8,21 +8,19 @@
 
   (define-test (client-html)
     (assert-equal "<!doctype html><div>test</div>\n"
-      (call-with-output-string
-        (l (out) (client-port swa-env (q html) out #f (list-q ((div "test"))))))))
+      (call-with-output-string (l (out) (client-port swa-env (q html) out #f (q (((div "test")))))))))
 
   (define-test (client-css)
     (assert-equal "div{display:none;}\n"
       (call-with-output-string
-        (l (out) (client-port swa-env (q css) out #f (list-q (("div" display none))))))))
+        (l (out) (client-port swa-env (q css) out #f (q ((("div" display none)))))))))
 
   (define-test (client-js)
     (assert-equal "\"use strict\";var a=3;\n"
-      (call-with-output-string
-        (l (out) (client-port swa-env (q js) out #f (list-q ((define a 3))))))))
+      (call-with-output-string (l (out) (client-port swa-env (q js) out #f (q (((define a 3)))))))))
 
   (define-test (client-file)
-    (and-let* ((path (client-file swa-env (q html) #f (list-q ((div "test"))))))
+    (and-let* ((path (client-file swa-env (q html) #f (q (((div "test")))))))
       (assert-equal "<!doctype html><div>test</div>\n"
         (file->string (string-append (swa-env-root swa-env) "webroot" path)))))
 
