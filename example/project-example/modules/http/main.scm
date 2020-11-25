@@ -14,7 +14,7 @@
       (alist-q title "test title"
         ; include the pre-processed css file for the bundles default
         css
-        (client-static (swa-http-request-swa-env request) (q project-name) (q css) (list-q default)))
+        (client-static (swa-http-request-swa-env request) (q project-name) (q css) (q (default))))
       (q project-name)
       ; use the template file layout and insert example content
       (list "layout" (list "example content")))))
