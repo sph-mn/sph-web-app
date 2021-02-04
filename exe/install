@@ -1,8 +1,9 @@
-#!/usr/bin/guile
+#!/usr/bin/env guile
 !#
 
 (import (sph install))
 
-(install-cli-guile (path-lib-scheme "modules/sph")
-  ("/usr/share/sph/web/app" "example/project-example" "example/project-minimal")
-  ("/usr/bin" 493 "exe/web-app"))
+(install-cli
+  (system-executables 755 "exe/web-app")
+  (guile-site-modules "modules/sph")
+  ("/usr/share/sph/web/app" "example/project-example" "example/project-minimal"))
