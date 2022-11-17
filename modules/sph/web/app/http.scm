@@ -13,13 +13,12 @@
   swa-http-request-headers swa-http-request-https?
   swa-http-request-if-modified-since swa-http-request-method
   swa-http-request-new swa-http-request-path
-  swa-http-request-query swa-http-request-query-parse
-  swa-http-request-swa-env swa-http-respond
-  swa-http-respond-query swa-http-response
-  swa-http-response* swa-http-response-body
-  swa-http-response-content-type-add swa-http-response-headers
-  swa-http-response-headers-add! swa-http-response-send
-  swa-http-response-send-body swa-http-response-status)
+  swa-http-request-query swa-http-request-swa-env
+  swa-http-respond swa-http-respond-query
+  swa-http-response swa-http-response*
+  swa-http-response-body swa-http-response-content-type-add
+  swa-http-response-headers swa-http-response-headers-add!
+  swa-http-response-send swa-http-response-send-body swa-http-response-status)
 
 (define sph-web-app-http-description
   "http request/response helpers.
