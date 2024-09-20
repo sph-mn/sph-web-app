@@ -64,7 +64,7 @@ an example project that combines sph-web-app with sph-web-publish: [sph-info](ht
 
 # installation
 * install all dependencies
-* [download](http://files.sph.mn/u/software/releases)
+* [download](http://sph.mn/files/u/software/releases)
   * alternatives: [git clone](https://github.com/sph-mn/sph-web-app)
 * unpack the downloaded archive. for example with "tar -xf sph-web-app.tgz" (-x for extract, -f for the input file)
 
