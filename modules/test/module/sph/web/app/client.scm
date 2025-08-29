@@ -16,7 +16,7 @@
         (l (out) (client-port swa-env (q css) out #f (q ((("div" display none)))))))))
 
   (define-test (client-js)
-    (assert-equal "\"use strict\";var a=3;\n"
+    (assert-equal "var a=3;\n"
       (call-with-output-string (l (out) (client-port swa-env (q js) out #f (q (((define a 3)))))))))
 
   (define-test (client-file)
